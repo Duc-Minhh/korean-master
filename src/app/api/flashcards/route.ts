@@ -49,7 +49,18 @@ export async function GET(request: NextRequest) {
       items = items.sort(() => Math.random() - 0.5).slice(0, limit);
     }
 
-    return NextResponse.json({ items, count: items.length });
+    // Distractor pool for multiple choice mode
+    const distractorPool = await prisma.vocabulary.findMany({
+      take: 60,
+      select: {
+        id: true,
+        korean: true,
+        vietnamese: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return NextResponse.json({ items, count: items.length, distractorPool });
   } catch (error) {
     console.error('Lỗi lấy dữ liệu Flashcard:', error);
     return NextResponse.json({ error: 'Không thể lấy dữ liệu thẻ ghi nhớ' }, { status: 500 });
