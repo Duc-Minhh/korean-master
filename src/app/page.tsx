@@ -1,101 +1,201 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect, useCallback } from 'react';
+import Sidebar, { NavTab } from '@/components/Sidebar';
+import DashboardView from '@/components/DashboardView';
+import VocabularyManager from '@/components/VocabularyManager';
+import GrammarManager from '@/components/GrammarManager';
+import FlashcardStudy from '@/components/FlashcardStudy';
+import SmartReviewSRS from '@/components/SmartReviewSRS';
+import QuizPractice from '@/components/QuizPractice';
+import GrammarHandbook from '@/components/GrammarHandbook';
+import PersonalDictionary from '@/components/PersonalDictionary';
+import CurriculumManager from '@/components/CurriculumManager';
+import SettingsBackup from '@/components/SettingsBackup';
+import MobileBottomNav from '@/components/MobileBottomNav';
+import MobileConnectModal from '@/components/MobileConnectModal';
+import { DashboardStats, Topic, Lesson } from '@/types';
+import { Menu, Search, PlusCircle, Flame, Smartphone } from 'lucide-react';
+
+export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+
+  // Global shared state
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch initial dashboard & metadata
+  const fetchData = useCallback(async () => {
+    try {
+      const [dashRes, topRes, curRes] = await Promise.all([
+        fetch('/api/dashboard'),
+        fetch('/api/topics'),
+        fetch('/api/curriculum'),
+      ]);
+
+      if (dashRes.ok) {
+        const d = await dashRes.json();
+        setStats(d);
+      }
+      if (topRes.ok) {
+        const t = await topRes.json();
+        setTopics(t.topics || []);
+      }
+      if (curRes.ok) {
+        const c = await curRes.json();
+        const allLessons: Lesson[] = [];
+        c.textbooks?.forEach((tb: any) => {
+          tb.chapters?.forEach((ch: any) => {
+            if (ch.lessons) allLessons.push(...ch.lessons);
+          });
+        });
+        setLessons(allLessons);
+      }
+    } catch (e) {
+      console.error('Lỗi tải dữ liệu ban đầu:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleQuickAddVocab = () => {
+    setActiveTab('vocabulary');
+  };
+
+  const handleQuickAddGrammar = () => {
+    setActiveTab('grammar');
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* Left Sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        streakCount={stats?.streakCount || 1}
+        isOpenMobile={isMobileMenuOpen}
+        setIsOpenMobile={setIsMobileMenuOpen}
+      />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* Main Content Area */}
+      <div className="flex-1 lg:pl-72 flex flex-col min-h-screen">
+        {/* Top Navbar */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition"
+              aria-label="Mở menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Quick Search Shortcut to Dictionary */}
+            <button
+              onClick={() => setActiveTab('dictionary')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-500 hover:text-slate-800 text-xs font-medium transition"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400" />
+              <span className="hidden sm:inline">Tra từ điển nhanh...</span>
+              <span className="sm:hidden">Tra từ</span>
+            </button>
+          </div>
+
+          {/* Topbar Right Tools */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Phone Connect Button */}
+            <button
+              onClick={() => setIsConnectModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200/80 transition shadow-2xs"
+              title="Quét mã QR để mở trên điện thoại"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="hidden sm:inline">Dùng trên điện thoại</span>
+              <span className="sm:hidden">Mobile</span>
+            </button>
+
+            {/* Streak Pill */}
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-700">
+              <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>{stats?.streakCount || 1} ngày</span>
+            </div>
+
+            {/* Quick Add Vocab Button */}
+            <button
+              onClick={() => setActiveTab('vocabulary')}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200 transition"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ Từ vựng</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Dynamic Page Views */}
+        <main className="flex-1 p-3.5 sm:p-8 pb-24 lg:pb-8 max-w-7xl w-full mx-auto">
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              stats={stats}
+              loading={loading}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onQuickAddVocab={handleQuickAddVocab}
+              onQuickAddGrammar={handleQuickAddGrammar}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          )}
+
+          {activeTab === 'vocabulary' && (
+            <VocabularyManager topics={topics} lessons={lessons} />
+          )}
+
+          {activeTab === 'grammar' && (
+            <GrammarManager topics={topics} lessons={lessons} />
+          )}
+
+          {activeTab === 'flashcards' && (
+            <FlashcardStudy topics={topics} lessons={lessons} />
+          )}
+
+          {activeTab === 'srs' && <SmartReviewSRS />}
+
+          {activeTab === 'quiz' && (
+            <QuizPractice topics={topics} lessons={lessons} />
+          )}
+
+          {activeTab === 'handbook' && (
+            <GrammarHandbook topics={topics} lessons={lessons} />
+          )}
+
+          {activeTab === 'dictionary' && <PersonalDictionary />}
+
+          {activeTab === 'curriculum' && <CurriculumManager />}
+
+          {activeTab === 'settings' && <SettingsBackup />}
+        </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <MobileBottomNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onOpenMenu={() => setIsMobileMenuOpen(true)}
+          dueReviewsCount={stats?.dueReviewsToday || 0}
+        />
+
+        {/* Mobile Connect QR Modal */}
+        <MobileConnectModal
+          isOpen={isConnectModalOpen}
+          onClose={() => setIsConnectModalOpen(false)}
+          localIp="192.168.1.176"
+          port={3000}
+        />
+      </div>
     </div>
   );
 }

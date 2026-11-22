@@ -1,0 +1,176 @@
+// Prisma Schema for PostgreSQL
+// Use this file if you connect to a PostgreSQL database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserSetting {
+  id                  String   @id @default("default-user")
+  name                String   @default("Người học tiếng Hàn")
+  targetWordsPerDay   Int      @default(10)
+  targetReviewPerDay  Int      @default(15)
+  theme               String   @default("light")
+  streakCount         Int      @default(1)
+  lastActiveDate      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model StudyLog {
+  id               String   @id @default(cuid())
+  date             String   @unique
+  wordsLearned     Int      @default(0)
+  grammarLearned   Int      @default(0)
+  reviewsCompleted Int      @default(0)
+  quizzesCompleted Int      @default(0)
+  streakMaintained Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Textbook {
+  id          String    @id @default(cuid())
+  title       String
+  level       String    @default("Sơ cấp 1")
+  description String?
+  color       String    @default("from-blue-600 to-indigo-700")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  chapters    Chapter[]
+}
+
+model Chapter {
+  id          String     @id @default(cuid())
+  title       String
+  order       Int        @default(1)
+  textbookId  String
+  textbook    Textbook   @relation(fields: [textbookId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id           String       @id @default(cuid())
+  title        String
+  order        Int          @default(1)
+  chapterId    String
+  chapter      Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  vocabularies Vocabulary[]
+  grammars     Grammar[]
+}
+
+model Topic {
+  id           String       @id @default(cuid())
+  name         String       @unique
+  icon         String       @default("BookOpen")
+  description  String?
+  color        String       @default("bg-blue-50 text-blue-700 border-blue-200")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  vocabularies Vocabulary[]
+  grammars     Grammar[]
+}
+
+model Vocabulary {
+  id                String          @id @default(cuid())
+  korean            String
+  hanja             String?
+  vietnamese        String
+  partOfSpeech      String          @default("Danh từ")
+  exampleKorean     String?
+  exampleVietnamese String?
+  notes             String?
+  status            String          @default("NOT_LEARNED")
+  isFavorite        Boolean         @default(false)
+  isDifficult       Boolean         @default(false)
+
+  // Spaced Repetition (SRS)
+  srsStep           Int             @default(0)
+  srsEaseFactor     Float           @default(2.5)
+  srsInterval       Int             @default(0)
+  nextReviewDate    DateTime?
+  lastReviewedAt    DateTime?
+  reviewCount       Int             @default(0)
+  incorrectCount    Int             @default(0)
+
+  // Relations
+  topicId           String?
+  topic             Topic?          @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  lessonId          String?
+  lesson            Lesson?         @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  reviewHistories   ReviewHistory[]
+  favorites         Favorite[]
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model Grammar {
+  id                String       @id @default(cuid())
+  structure         String
+  meaning           String
+  usage             String
+  formation         String
+  exceptions        String?
+  exampleKorean     String
+  exampleVietnamese String
+  similarGrammar    String?
+  notes             String?
+  status            String       @default("NOT_LEARNED")
+  isFavorite        Boolean      @default(false)
+
+  // Relations
+  topicId           String?
+  topic             Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  lessonId          String?
+  lesson            Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  favorites         Favorite[]
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model ReviewHistory {
+  id           String      @id @default(cuid())
+  vocabularyId String
+  vocabulary   Vocabulary  @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+  rating       String
+  interval     Int
+  reviewedAt   DateTime    @default(now())
+}
+
+model QuizHistory {
+  id             String    @id @default(cuid())
+  quizType       String
+  title          String
+  score          Int
+  totalQuestions Int
+  correctCount   Int
+  wrongCount     Int
+  details        String?
+  completedAt    DateTime  @default(now())
+}
+
+model Favorite {
+  id           String      @id @default(cuid())
+  type         String
+  targetId     String
+  vocabularyId String?
+  vocabulary   Vocabulary? @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+  grammarId    String?
+  grammar      Grammar?    @relation(fields: [grammarId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+
+  @@unique([type, targetId])
+}
