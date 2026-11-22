@@ -259,6 +259,58 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
     }
   };
 
+  // Helper to flexibly match column names regardless of accents, spaces, or slashes
+  const getFlexibleValue = (row: Record<string, any>, candidateKeywords: string[]): string => {
+    const clean = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+        .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
+
+    const cleanedCandidates = candidateKeywords.map(clean);
+
+    for (const [key, val] of Object.entries(row)) {
+      if (val === undefined || val === null) continue;
+      const cleanedKey = clean(key);
+      for (const cand of cleanedCandidates) {
+        if (cleanedKey === cand || cleanedKey.includes(cand) || cand.includes(cleanedKey)) {
+          return String(val).trim();
+        }
+      }
+    }
+    return '';
+  };
+
+  // Download Sample Excel Template
+  const handleDownloadSampleExcel = () => {
+    const sampleRows = [
+      {
+        'Từ tiếng Hàn': '경영학',
+        'Phiên âm / Hán Hàn': 'gyeong-yeong-hak',
+        'Nghĩa tiếng Việt': 'Quản trị kinh doanh',
+        'Từ loại': 'Danh từ',
+        'Ví dụ tiếng Hàn': '저는 경영학을 공부합니다.',
+        'Dịch nghĩa câu ví dụ': 'Tôi học ngành quản trị kinh doanh.',
+        'Ghi chú': 'Gốc Hán: KINH DOANH HỌC (經營學)',
+      },
+      {
+        'Từ tiếng Hàn': '선생님',
+        'Phiên âm / Hán Hàn': 'seon-saeng-nim',
+        'Nghĩa tiếng Việt': 'Giáo viên, thầy/cô giáo',
+        'Từ loại': 'Danh từ',
+        'Ví dụ tiếng Hàn': '선생님께서 한국어를 가르치십니다.',
+        'Dịch nghĩa câu ví dụ': 'Thầy giáo dạy tiếng Hàn Quốc.',
+        'Ghi chú': 'Kính ngữ 님',
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Mau_Nhap_Tu_Vung');
+    XLSX.writeFile(wb, 'Mau_Nhap_Tu_Vung_Tieng_Han.xlsx');
+  };
+
   // Import file handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -273,15 +325,58 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        // Normalize keys
+        // Normalize keys intelligently with flexible matching
         const formatted = data.map((row: any) => ({
-          korean: row['Từ tiếng Hàn'] || row['Korean'] || row['korean'] || row['Từ'] || '',
-          hanja: row['Phiên âm'] || row['Hanja'] || row['hanja'] || '',
-          vietnamese: row['Nghĩa tiếng Việt'] || row['Vietnamese'] || row['vietnamese'] || row['Nghĩa'] || '',
-          partOfSpeech: row['Từ loại'] || row['partOfSpeech'] || 'Danh từ',
-          exampleKorean: row['Ví dụ tiếng Hàn'] || row['exampleKorean'] || row['Ví dụ'] || '',
-          exampleVietnamese: row['Dịch nghĩa ví dụ'] || row['exampleVietnamese'] || row['Dịch ví dụ'] || '',
-          notes: row['Ghi chú'] || row['notes'] || '',
+          korean: getFlexibleValue(row, ['tutienghan', 'tienghan', 'korean', 'tu', 'word']),
+          hanja: getFlexibleValue(row, [
+            'phienamhanhan',
+            'phienam',
+            'hanhan',
+            'hanja',
+            'phatam',
+            'cachdoc',
+            'pronunciation',
+            'romanization',
+          ]),
+          vietnamese: getFlexibleValue(row, [
+            'nghiatiengviet',
+            'nghiaviet',
+            'vietnamese',
+            'nghia',
+            'meaning',
+          ]),
+          partOfSpeech:
+            getFlexibleValue(row, ['tuloai', 'loaitu', 'partofspeech', 'pos', 'type']) ||
+            'Danh từ',
+          exampleKorean: getFlexibleValue(row, [
+            'vidutienghan',
+            'viduhan',
+            'vidu',
+            'examplekorean',
+            'cauvidu',
+            'example',
+          ]),
+          exampleVietnamese: getFlexibleValue(row, [
+            'dichnghiacauvidu',
+            'dichnghiavidu',
+            'dichcauvidu',
+            'dichvidu',
+            'dichcau',
+            'nghiacauvidu',
+            'nghiavidu',
+            'dichnghia',
+            'dich',
+            'examplevietnamese',
+            'translation',
+          ]),
+          notes: getFlexibleValue(row, [
+            'ghichucanhan',
+            'ghichu',
+            'chuthich',
+            'meonho',
+            'notes',
+            'note',
+          ]),
         })).filter((item: any) => item.korean && item.vietnamese);
 
         if (formatted.length === 0) {
@@ -945,14 +1040,24 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  <span>Định dạng file yêu cầu:</span>
-                </p>
-                <p>
-                  File Excel (.xlsx) hoặc .csv chứa các cột tiêu đề: <b>Từ tiếng Hàn</b>, <b>Nghĩa tiếng Việt</b>, <b>Phiên âm</b> (tùy chọn), <b>Từ loại</b>, <b>Ví dụ tiếng Hàn</b>, <b>Dịch nghĩa ví dụ</b>.
-                </p>
+              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>Định dạng file yêu cầu:</span>
+                  </p>
+                  <p>
+                    Các cột trong file: <b>Từ tiếng Hàn</b>, <b>Phiên âm / Hán Hàn</b>, <b>Nghĩa tiếng Việt</b>, <b>Từ loại</b>, <b>Ví dụ tiếng Hàn</b>, <b>Dịch nghĩa câu ví dụ</b>, <b>Ghi chú</b>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadSampleExcel}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-blue-100 text-blue-700 font-bold border border-blue-300 text-xs shadow-2xs transition flex items-center gap-1.5 flex-shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Tải file Excel mẫu chuẩn</span>
+                </button>
               </div>
 
               {/* Upload Drop Zone */}
@@ -1014,23 +1119,27 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                   <p className="text-xs font-bold text-slate-700 uppercase mb-2">
                     Xem trước ({importPreview.length} từ hợp lệ):
                   </p>
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl">
+                  <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-xl">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 font-semibold text-slate-600">
                         <tr>
                           <th className="p-2">Tiếng Hàn</th>
+                          <th className="p-2">Phiên âm / Hán</th>
                           <th className="p-2">Nghĩa Việt</th>
                           <th className="p-2">Từ loại</th>
-                          <th className="p-2">Ví dụ</th>
+                          <th className="p-2">Ví dụ tiếng Hàn</th>
+                          <th className="p-2">Dịch câu ví dụ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {importPreview.slice(0, 10).map((row, idx) => (
                           <tr key={idx}>
                             <td className="p-2 font-bold font-korean">{row.korean}</td>
-                            <td className="p-2">{row.vietnamese}</td>
-                            <td className="p-2">{row.partOfSpeech}</td>
-                            <td className="p-2 truncate max-w-[150px]">{row.exampleKorean || '-'}</td>
+                            <td className="p-2 text-slate-500 font-mono">{row.hanja || '-'}</td>
+                            <td className="p-2 font-medium text-slate-900">{row.vietnamese}</td>
+                            <td className="p-2 text-slate-600">{row.partOfSpeech}</td>
+                            <td className="p-2 font-korean truncate max-w-[140px]">{row.exampleKorean || '-'}</td>
+                            <td className="p-2 italic text-slate-600 truncate max-w-[140px]">{row.exampleVietnamese || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
