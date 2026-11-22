@@ -65,9 +65,6 @@ export default function PersonalDictionary() {
       {/* Search Header */}
       <div className="bg-gradient-to-br from-blue-700 via-indigo-700 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-elevated">
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Từ điển cá nhân</h1>
-        <p className="text-sm text-blue-100/90 mt-1 max-w-xl">
-          Tra cứu nhanh từ vựng và cấu trúc ngữ pháp trực tiếp từ kho dữ liệu bạn đã lưu trữ. Không cần internet hoặc API bên ngoài.
-        </p>
 
         {/* Big Live Search Box */}
         <div className="mt-6 relative">
