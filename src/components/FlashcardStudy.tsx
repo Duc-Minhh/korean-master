@@ -257,11 +257,14 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
         const items: Vocabulary[] = data.items || [];
         const pool: DistractorItem[] = data.distractorPool || [];
 
-        setCards(items);
+        // Luôn tự động xáo trộn ngẫu nhiên thứ tự câu hỏi mỗi lần vào làm
+        const shuffledItems = [...items].sort(() => Math.random() - 0.5);
+
+        setCards(shuffledItems);
         setDistractorPool(pool);
 
-        if (items.length > 0 && autoSpeak && frontLanguage === 'korean') {
-          speakKorean(items[0].korean);
+        if (shuffledItems.length > 0 && autoSpeak && frontLanguage === 'korean') {
+          speakKorean(shuffledItems[0].korean);
         }
       } catch (err) {
         showToast('Lỗi tải bộ thẻ Flashcard', 'error');
@@ -622,16 +625,30 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
     handleNextCard,
   ]);
 
-  // Restart session with all cards in this deck
+  // Restart session with all cards in this deck (luôn xáo trộn ngẫu nhiên thứ tự mới)
   const handleRestartFull = () => {
     if (activeDeck) {
-      fetchDeckCards(activeDeck, isDifficultOnly);
+      if (cards.length > 1) {
+        setCards([...cards].sort(() => Math.random() - 0.5));
+        setCurrentIndex(0);
+        setIsFlipped(false);
+        setIsSessionCompleted(false);
+        setSessionStats({ again: 0, hard: 0, good: 0 });
+        setMissedCardIds([]);
+        setSelectedOptionIndex(null);
+        setIsAnswered(false);
+        setIsAnswerCorrect(null);
+      } else {
+        fetchDeckCards(activeDeck, isDifficultOnly);
+      }
     }
   };
 
-  // Re-study only missed or hard cards
+  // Re-study only missed or hard cards (xáo trộn ngẫu nhiên)
   const handleRestudyMissed = () => {
-    const filteredMissed = cards.filter((c) => missedCardIds.includes(c.id));
+    const filteredMissed = cards
+      .filter((c) => missedCardIds.includes(c.id))
+      .sort(() => Math.random() - 0.5);
     if (filteredMissed.length > 0) {
       setCards(filteredMissed);
       setCurrentIndex(0);
@@ -639,6 +656,9 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
       setIsSessionCompleted(false);
       setSessionStats({ again: 0, hard: 0, good: 0 });
       setMissedCardIds([]);
+      setSelectedOptionIndex(null);
+      setIsAnswered(false);
+      setIsAnswerCorrect(null);
       showToast(`Bắt đầu ôn lại ${filteredMissed.length} thẻ chưa nhớ!`, 'info');
     } else {
       showToast('Bạn đã nhớ tốt tất cả các thẻ! Tuyệt vời!', 'success');
