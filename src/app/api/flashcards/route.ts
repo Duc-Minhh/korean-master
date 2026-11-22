@@ -10,13 +10,14 @@ export async function GET(request: NextRequest) {
     const mode = searchParams.get('mode') || 'all'; // all, new, topic, lesson, difficult, random
     const topicId = searchParams.get('topicId');
     const lessonId = searchParams.get('lessonId');
-    const limit = parseInt(searchParams.get('limit') || '30');
+    const difficultOnly = searchParams.get('difficultOnly') === 'true';
+    const limit = parseInt(searchParams.get('limit') || '300');
 
     const where: any = {};
 
     if (mode === 'new') {
       where.status = 'NOT_LEARNED';
-    } else if (mode === 'difficult') {
+    } else if (mode === 'difficult' || difficultOnly) {
       where.OR = [
         { isDifficult: true },
         { incorrectCount: { gt: 0 } },
@@ -36,7 +37,9 @@ export async function GET(request: NextRequest) {
       take: mode === 'random' ? undefined : limit,
       include: {
         topic: true,
-        lesson: true,
+        lesson: {
+          include: { chapter: { include: { textbook: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -56,10 +59,23 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { vocabularyId, rating } = body; // rating: 'AGAIN' | 'HARD' | 'GOOD' | 'EASY'
+    const { vocabularyId, rating, action, isFavorite } = body;
 
-    if (!vocabularyId || !rating) {
-      return NextResponse.json({ error: 'Thiếu vocabularyId hoặc rating' }, { status: 400 });
+    if (!vocabularyId) {
+      return NextResponse.json({ error: 'Thiếu vocabularyId' }, { status: 400 });
+    }
+
+    // Handle toggle favorite
+    if (action === 'toggleFavorite') {
+      const updated = await prisma.vocabulary.update({
+        where: { id: vocabularyId },
+        data: { isFavorite: Boolean(isFavorite) },
+      });
+      return NextResponse.json({ success: true, updated });
+    }
+
+    if (!rating) {
+      return NextResponse.json({ error: 'Thiếu rating' }, { status: 400 });
     }
 
     const vocab = await prisma.vocabulary.findUnique({

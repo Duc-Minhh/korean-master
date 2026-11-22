@@ -20,6 +20,14 @@ export async function GET() {
                     grammars: true,
                   },
                 },
+                vocabularies: {
+                  take: 5,
+                  select: {
+                    id: true,
+                    korean: true,
+                    vietnamese: true,
+                  },
+                },
               },
             },
             _count: {

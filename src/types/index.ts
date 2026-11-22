@@ -28,6 +28,7 @@ export interface Topic {
   icon: string;
   description?: string | null;
   color: string;
+  vocabularies?: { id: string; korean: string; vietnamese: string }[];
   _count?: {
     vocabularies: number;
     grammars: number;
@@ -64,6 +65,7 @@ export interface Lesson {
   order: number;
   chapterId: string;
   chapter?: Chapter;
+  vocabularies?: { id: string; korean: string; vietnamese: string }[];
   _count?: {
     vocabularies: number;
     grammars: number;
