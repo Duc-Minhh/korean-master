@@ -12,14 +12,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Korean Master – 나의 한국어 공부 | Ứng dụng học tiếng Hàn cá nhân',
+  title: 'Học Tiếng Hàn – 한국어 공부 | Ứng dụng học tiếng Hàn cá nhân',
   description:
     'Ứng dụng web tự quản lý và học tiếng Hàn cá nhân hoàn chỉnh: từ vựng, ngữ pháp, flashcard, spaced repetition (SRS), kiểm tra và từ điển cá nhân.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Korean Master',
+    title: 'Học Tiếng Hàn',
   },
 };
 

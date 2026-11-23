@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Korean Master – 나의 한국어 공부',
-    short_name: 'KoreanMaster',
+    name: 'Học Tiếng Hàn – 한국어 공부',
+    short_name: 'HocTiengHan',
     description: 'Ứng dụng học tiếng Hàn cá nhân hoàn chỉnh: từ vựng, ngữ pháp, flashcard và bài kiểm tra.',
     start_url: '/',
     display: 'standalone',

@@ -86,9 +86,9 @@ export default function Sidebar({
             </div>
             <div>
               <h1 className="font-bold text-base text-white tracking-tight flex items-center gap-1.5">
-                Korean Master
+                Học Tiếng Hàn
               </h1>
-              <p className="text-xs text-blue-400 font-medium">나의 한국어 공부</p>
+              <p className="text-xs text-blue-400 font-medium">한국어 공부</p>
             </div>
           </div>
           <button
