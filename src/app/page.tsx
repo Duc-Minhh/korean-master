@@ -49,27 +49,20 @@ export default function HomePage() {
         const c = await curRes.json();
         const allLessons: Lesson[] = [];
         c.textbooks?.forEach((tb: any) => {
-          tb.chapters?.forEach((ch: any) => {
-            if (ch.lessons) {
-              ch.lessons.forEach((ls: any) => {
-                allLessons.push({
-                  ...ls,
-                  chapter: {
-                    id: ch.id,
-                    title: ch.title,
-                    order: ch.order,
-                    textbookId: tb.id,
-                    textbook: {
-                      id: tb.id,
-                      title: tb.title,
-                      level: tb.level,
-                      color: tb.color,
-                    },
-                  },
-                });
+          if (tb.lessons && tb.lessons.length > 0) {
+            tb.lessons.forEach((ls: any) => {
+              allLessons.push({
+                ...ls,
+                textbookId: tb.id,
+                textbook: {
+                  id: tb.id,
+                  title: tb.title,
+                  level: tb.level,
+                  color: tb.color,
+                },
               });
-            }
-          });
+            });
+          }
         });
         setLessons(allLessons);
       }

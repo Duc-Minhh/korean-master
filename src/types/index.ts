@@ -43,8 +43,10 @@ export interface Textbook {
   description?: string | null;
   color: string;
   chapters?: Chapter[];
+  lessons?: Lesson[];
   _count?: {
     chapters: number;
+    lessons: number;
   };
 }
 
@@ -64,7 +66,9 @@ export interface Lesson {
   id: string;
   title: string;
   order: number;
-  chapterId: string;
+  textbookId?: string | null;
+  textbook?: Textbook;
+  chapterId?: string | null;
   chapter?: Chapter;
   vocabularies?: { id: string; korean: string; vietnamese: string }[];
   _count?: {

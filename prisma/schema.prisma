@@ -44,6 +44,7 @@ model Textbook {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   chapters    Chapter[]
+  lessons     Lesson[]
 }
 
 model Chapter {
@@ -61,8 +62,10 @@ model Lesson {
   id           String       @id @default(cuid())
   title        String
   order        Int          @default(1)
-  chapterId    String
-  chapter      Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  textbookId   String?
+  textbook     Textbook?    @relation(fields: [textbookId], references: [id], onDelete: Cascade)
+  chapterId    String?
+  chapter      Chapter?     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   vocabularies Vocabulary[]

@@ -61,19 +61,23 @@ export async function DELETE(
     const type = searchParams.get('type');
 
     if (type === 'textbook') {
-      // Find all chapters and lessons inside this textbook
-      const chapters = await prisma.chapter.findMany({
-        where: { textbookId: params.id },
-        include: { lessons: { select: { id: true } } },
+      // Find all lessons inside this textbook directly or via chapters
+      const lessons = await prisma.lesson.findMany({
+        where: {
+          OR: [
+            { textbookId: params.id },
+            { chapter: { textbookId: params.id } },
+          ],
+        },
+        select: { id: true },
       });
-      const lessonIds = chapters.flatMap((c) => c.lessons.map((l) => l.id));
-      const chapterIds = chapters.map((c) => c.id);
+      const lessonIds = lessons.map((l) => l.id);
 
       await prisma.$transaction([
         prisma.vocabulary.deleteMany({ where: { lessonId: { in: lessonIds } } }),
         prisma.grammar.deleteMany({ where: { lessonId: { in: lessonIds } } }),
         prisma.lesson.deleteMany({ where: { id: { in: lessonIds } } }),
-        prisma.chapter.deleteMany({ where: { id: { in: chapterIds } } }),
+        prisma.chapter.deleteMany({ where: { textbookId: params.id } }),
         prisma.textbook.delete({ where: { id: params.id } }),
       ]);
     } else if (type === 'chapter') {

@@ -7,8 +7,6 @@ import {
   Plus,
   Trash2,
   Edit2,
-  ChevronRight,
-  ChevronDown,
   Layers,
   FileText,
   Tag,
@@ -16,7 +14,7 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react';
-import { Textbook, Chapter, Lesson, Topic } from '@/types';
+import { Textbook, Lesson, Topic } from '@/types';
 import { useToast } from './Toast';
 
 export default function CurriculumManager() {
@@ -25,10 +23,9 @@ export default function CurriculumManager() {
   const [textbooks, setTextbooks] = useState<Textbook[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
 
   // Modals
-  const [modalType, setModalType] = useState<'textbook' | 'chapter' | 'lesson' | 'topic' | null>(null);
+  const [modalType, setModalType] = useState<'textbook' | 'lesson' | 'topic' | null>(null);
   const [parentId, setParentId] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleInput, setTitleInput] = useState('');
@@ -47,15 +44,6 @@ export default function CurriculumManager() {
         const tpData = await tpRes.json();
         setTextbooks(tbData.textbooks || []);
         setTopics(tpData.topics || []);
-
-        // Expand chapters by default
-        const exp: Record<string, boolean> = {};
-        tbData.textbooks?.forEach((tb: Textbook) => {
-          tb.chapters?.forEach((ch) => {
-            exp[ch.id] = true;
-          });
-        });
-        setExpandedChapters(exp);
       }
     } catch (err) {
       showToast('Lỗi tải dữ liệu giáo trình', 'error');
@@ -68,14 +56,7 @@ export default function CurriculumManager() {
     fetchCurriculum();
   }, []);
 
-  const toggleChapter = (chapterId: string) => {
-    setExpandedChapters((prev) => ({
-      ...prev,
-      [chapterId]: !prev[chapterId],
-    }));
-  };
-
-  const handleOpenAdd = (type: 'textbook' | 'chapter' | 'lesson' | 'topic', parent = '') => {
+  const handleOpenAdd = (type: 'textbook' | 'lesson' | 'topic', parent = '') => {
     setModalType(type);
     setParentId(parent);
     setEditingId(null);
@@ -109,8 +90,7 @@ export default function CurriculumManager() {
             title: titleInput.trim(),
             level: levelInput,
             description: descInput.trim(),
-            ...(modalType === 'chapter' && { textbookId: parentId }),
-            ...(modalType === 'lesson' && { chapterId: parentId }),
+            ...(modalType === 'lesson' && { textbookId: parentId }),
           }),
         });
         if (!res.ok) throw new Error('Không thể tạo mới');
@@ -136,10 +116,8 @@ export default function CurriculumManager() {
       confirmMsg = `Bạn có chắc chắn muốn xóa bài học "${name}"?\nToàn bộ ${
         gText ? `${gText} thuộc bài học này` : 'ngữ pháp liên kết'
       } cũng sẽ bị xóa vĩnh viễn khỏi hệ thống!`;
-    } else if (type === 'chapter') {
-      confirmMsg = `Bạn có chắc chắn muốn xóa chương "${name}"?\nToàn bộ các bài học, từ vựng và ngữ pháp thuộc chương này sẽ bị xóa vĩnh viễn!`;
     } else if (type === 'textbook') {
-      confirmMsg = `Bạn có chắc chắn muốn xóa giáo trình "${name}"?\nToàn bộ chương, bài học, từ vựng và ngữ pháp thuộc giáo trình này sẽ bị xóa vĩnh viễn!`;
+      confirmMsg = `Bạn có chắc chắn muốn xóa giáo trình "${name}"?\nToàn bộ bài học, từ vựng và ngữ pháp thuộc giáo trình này sẽ bị xóa vĩnh viễn!`;
     }
 
     if (!confirm(confirmMsg)) {
@@ -169,7 +147,7 @@ export default function CurriculumManager() {
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản lý bài học</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tự do tổ chức phân cấp: Giáo trình → Chương → Bài học và Chủ đề để hệ thống hóa kiến thức.
+            Tổ chức cấu trúc: Giáo trình → Bài học và Chủ đề để hệ thống hóa kiến thức.
           </p>
         </div>
 
@@ -249,10 +227,10 @@ export default function CurriculumManager() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleOpenAdd('chapter', tb.id)}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold backdrop-blur transition"
+                    onClick={() => handleOpenAdd('lesson', tb.id)}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow transition"
                   >
-                    + Thêm chương
+                    + Thêm bài học
                   </button>
                   <button
                     onClick={() => handleDeleteItem('textbook', tb.id, tb.title)}
@@ -263,91 +241,40 @@ export default function CurriculumManager() {
                 </div>
               </div>
 
-              {/* Chapters List */}
+              {/* Lessons List inside Textbook */}
               <div className="divide-y divide-slate-100 p-2">
-                {tb.chapters && tb.chapters.length > 0 ? (
-                  tb.chapters.map((ch) => {
-                    const isExpanded = expandedChapters[ch.id];
-                    return (
-                      <div key={ch.id} className="p-3">
-                        {/* Chapter Row */}
-                        <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => toggleChapter(ch.id)}
-                            className="flex items-center gap-2 text-left font-bold text-sm text-slate-800 hover:text-blue-600 transition"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-slate-400" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-slate-400" />
-                            )}
-                            <span>{ch.title}</span>
-                            <span className="text-xs font-normal text-slate-400">
-                              ({ch.lessons?.length || 0} bài học)
-                            </span>
-                          </button>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenAdd('lesson', ch.id)}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 rounded hover:bg-blue-50"
-                            >
-                              + Thêm bài học
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem('chapter', ch.id, ch.title)}
-                              className="text-slate-300 hover:text-rose-600 p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Lessons List inside Chapter */}
-                        {isExpanded && ch.lessons && (
-                          <div className="mt-2 ml-6 pl-3 border-l-2 border-slate-100 space-y-1.5">
-                            {ch.lessons.length === 0 ? (
-                              <p className="text-xs text-slate-400 py-1 italic">
-                                Chưa có bài học nào trong chương này
-                              </p>
-                            ) : (
-                              ch.lessons.map((ls) => (
-                                <div
-                                  key={ls.id}
-                                  className="p-2.5 rounded-xl hover:bg-slate-50 flex items-center justify-between text-xs transition"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                    <span className="font-semibold text-slate-800">{ls.title}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-[11px] text-slate-400">
-                                      {ls._count?.grammars || 0} ngữ pháp
-                                    </span>
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteItem('lesson', ls.id, ls.title, {
-                                          vocabCount: ls._count?.vocabularies,
-                                          grammarCount: ls._count?.grammars,
-                                        })
-                                      }
-                                      className="text-slate-300 hover:text-rose-600 p-1"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
+                {tb.lessons && tb.lessons.length > 0 ? (
+                  tb.lessons.map((ls) => (
+                    <div
+                      key={ls.id}
+                      className="p-3 rounded-xl hover:bg-slate-50 flex items-center justify-between text-xs transition"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="font-semibold text-sm text-slate-800">{ls.title}</span>
                       </div>
-                    );
-                  })
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400">
+                          {ls._count?.grammars || 0} ngữ pháp
+                        </span>
+                        <button
+                          onClick={() =>
+                            handleDeleteItem('lesson', ls.id, ls.title, {
+                              vocabCount: ls._count?.vocabularies,
+                              grammarCount: ls._count?.grammars,
+                            })
+                          }
+                          className="text-slate-300 hover:text-rose-600 p-1.5 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
                 ) : (
                   <p className="p-4 text-xs text-slate-400 text-center italic">
-                    Chưa có chương nào. Nhấn "+ Thêm chương" ở góc trên để tạo.
+                    Chưa có bài học nào. Nhấn "+ Thêm bài học" ở góc trên để tạo.
                   </p>
                 )}
               </div>
@@ -364,8 +291,6 @@ export default function CurriculumManager() {
               <h3 className="font-bold text-base text-slate-900">
                 {modalType === 'textbook'
                   ? 'Thêm giáo trình mới'
-                  : modalType === 'chapter'
-                  ? 'Thêm chương mới'
                   : modalType === 'lesson'
                   ? 'Thêm bài học mới'
                   : 'Thêm chủ đề mới'}
