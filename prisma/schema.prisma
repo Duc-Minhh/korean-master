@@ -18,6 +18,7 @@ model UserSetting {
   theme               String   @default("light") // light, dark, navy
   streakCount         Int      @default(1)
   lastActiveDate      String?  // Format: YYYY-MM-DD
+  geminiApiKey        String?  // Google Gemini API Key for AI quiz generation
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }

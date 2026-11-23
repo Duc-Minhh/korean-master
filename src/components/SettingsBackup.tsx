@@ -29,6 +29,7 @@ export default function SettingsBackup() {
   const [reviewTarget, setReviewTarget] = useState(15);
   const [userName, setUserName] = useState('');
   const [theme, setTheme] = useState('light');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
 
   // Backup restore file state
   const [backupFile, setBackupFile] = useState<File | null>(null);
@@ -46,6 +47,7 @@ export default function SettingsBackup() {
           setReviewTarget(data.targetReviewPerDay || 15);
           setUserName(data.name || 'Người học tiếng Hàn');
           setTheme(data.theme || 'light');
+          setGeminiApiKey(data.geminiApiKey || '');
         }
       } catch (e) {
         showToast('Lỗi tải cài đặt', 'error');
@@ -69,10 +71,11 @@ export default function SettingsBackup() {
           targetWordsPerDay: wordsTarget,
           targetReviewPerDay: reviewTarget,
           theme,
+          geminiApiKey,
         }),
       });
       if (!res.ok) throw new Error('Không thể lưu cài đặt');
-      showToast('Đã lưu cấu hình học tập thành công!', 'success');
+      showToast('Đã lưu cấu hình học tập và API Key thành công!', 'success');
     } catch (err) {
       showToast('Lỗi lưu cài đặt', 'error');
     } finally {
@@ -219,6 +222,43 @@ export default function SettingsBackup() {
           </div>
         </div>
 
+        {/* AI Gemini Integration Section */}
+        <div className="pt-4 border-t border-slate-100 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Google Gemini API Key (Tự động tạo câu hỏi bài tập bằng AI)</span>
+            </label>
+            {geminiApiKey ? (
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                ✓ Đã kích hoạt AI
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400">Tùy chọn (Miễn phí)</span>
+            )}
+          </div>
+
+          <input
+            type="password"
+            placeholder="Dán API Key (AIzaSy...) để AI tự động sáng tạo đề không giới hạn"
+            value={geminiApiKey}
+            onChange={(e) => setGeminiApiKey(e.target.value)}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
+          />
+
+          <p className="text-[11px] text-slate-500">
+            Khi nhập API Key, AI sẽ tự động sáng tạo ra 10 - 20 câu hỏi ngữ cảnh đời sống hoàn toàn mới mỗi lần bạn vào luyện tập.{' '}
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-600 font-bold hover:underline"
+            >
+              Lấy API Key miễn phí tại Google AI Studio ↗
+            </a>
+          </p>
+        </div>
+
         <div className="pt-3 border-t border-slate-100 flex justify-end">
           <button
             type="submit"
@@ -226,7 +266,7 @@ export default function SettingsBackup() {
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition flex items-center gap-1.5"
           >
             <Save className="w-4 h-4" />
-            <span>{saving ? 'Đang lưu...' : 'Lưu cài đặt mục tiêu'}</span>
+            <span>{saving ? 'Đang lưu...' : 'Lưu cấu hình & API Key'}</span>
           </button>
         </div>
       </form>

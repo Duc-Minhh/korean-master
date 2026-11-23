@@ -41,6 +41,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [isAIGenerated, setIsAIGenerated] = useState(false);
 
   // Result state
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
@@ -86,10 +87,15 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
       }
 
       setQuestions(data.questions);
+      setIsAIGenerated(Boolean(data.isAIGenerated));
       setUserAnswers({});
       setCurrentQIndex(0);
       setQuizResult(null);
       setIsTesting(true);
+
+      if (data.isAIGenerated) {
+        showToast('✨ AI Gemini vừa sáng tạo đề thi mới cho bạn!', 'info');
+      }
     } catch (err: any) {
       showToast(err.message || 'Lỗi khởi tạo bài kiểm tra', 'error');
     } finally {
@@ -278,9 +284,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
           {/* Quiz Room Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                {currentQ?.typeName}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
+                  {currentQ?.typeName}
+                </span>
+                {isAIGenerated && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                    <span>AI Gemini</span>
+                  </span>
+                )}
+              </div>
               <p className="text-sm font-semibold text-slate-800 mt-0.5">
                 Câu hỏi {currentQIndex + 1} / {questions.length}
               </p>

@@ -20,6 +20,7 @@ export interface UserSetting {
   theme: string;
   streakCount: number;
   lastActiveDate: string | null;
+  geminiApiKey?: string | null;
 }
 
 export interface Topic {

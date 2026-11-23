@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { GoogleGenAI } from '@google/genai';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,221 @@ const DEFAULT_GRAMMAR_POOL = [
   },
 ];
 
+// Rich set of Korean verbs and dynamic templates for non-repeating procedural generation
+const DYNAMIC_VERB_TEMPLATES = [
+  {
+    base: '사다',
+    meaningVi: 'mua',
+    past: '산',
+    present: '사는',
+    future: '살',
+    connective: '사서',
+    rule: 'Động từ "사다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '어제 백화점에서 [ _____ ] 옷이 아주 마음에 들어요.',
+    sentenceVi: 'Bộ quần áo tôi đã mua ở trung tâm thương mại hôm qua rất vừa ý.',
+  },
+  {
+    base: '먹다',
+    meaningVi: 'ăn',
+    past: '먹은',
+    present: '먹는',
+    future: '먹을',
+    connective: '먹어서',
+    rule: 'Động từ "먹다" có patchim kết hợp với "-은"',
+    sentence: '어제 저녁에 식당에서 [ _____ ] 불고기가 정말 맛있었어요.',
+    sentenceVi: 'Món thịt nướng tôi đã ăn ở nhà hàng tối qua thực sự rất ngon.',
+  },
+  {
+    base: '보다',
+    meaningVi: 'xem',
+    past: '본',
+    present: '보는',
+    future: '볼',
+    connective: '봐서',
+    rule: 'Động từ "보다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '지난 주말에 극장에서 [ _____ ] 영화가 무척 감동적이었어요.',
+    sentenceVi: 'Bộ phim tôi đã xem ở rạp cuối tuần trước vô cùng cảm động.',
+  },
+  {
+    base: '만들다',
+    meaningVi: 'làm, chế biến',
+    past: '만든',
+    present: '만드는',
+    future: '만들',
+    connective: '만들어서',
+    rule: 'Bất quy tắc "ㄹ": Động từ "만들다" bỏ "ㄹ" rồi kết hợp với "-ㄴ" thành "만든"',
+    sentence: '어머니께서 직접 [ _____ ] 김치가 제일 맛있어요.',
+    sentenceVi: 'Món kim chi do mẹ tự tay làm là ngon nhất.',
+  },
+  {
+    base: '듣다',
+    meaningVi: 'nghe',
+    past: '들은',
+    present: '듣는',
+    future: '들을',
+    connective: '들어서',
+    rule: 'Bất quy tắc "ㄷ": Động từ "듣다" gặp nguyên âm biến thành "들" kết hợp với "-은" thành "들은"',
+    sentence: '어젯밤 라디오에서 [ _____ ] 노래 제목이 무엇인가요?',
+    sentenceVi: 'Tên bài hát tôi đã nghe trên radio tối qua là gì vậy?',
+  },
+  {
+    base: '만나다',
+    meaningVi: 'gặp gỡ',
+    past: '만난',
+    present: '만나는',
+    future: '만날',
+    connective: '만나서',
+    rule: 'Động từ "만나다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '어제 카페에서 [ _____ ] 친구는 고등학교 동창이에요.',
+    sentenceVi: 'Người bạn tôi đã gặp ở quán cà phê hôm qua là bạn học cùng cấp 3.',
+  },
+  {
+    base: '읽다',
+    meaningVi: 'đọc',
+    past: '읽은',
+    present: '읽는',
+    future: '읽을',
+    connective: '읽어서',
+    rule: 'Động từ "읽다" có patchim kết hợp với "-은"',
+    sentence: '도서관에서 [ _____ ] 소설책이 정말 흥미진진했어요.',
+    sentenceVi: 'Cuốn tiểu thuyết tôi đã đọc ở thư viện thực sự rất hấp dẫn.',
+  },
+  {
+    base: '마시다',
+    meaningVi: 'uống',
+    past: '마신',
+    present: '마시는',
+    future: '마실',
+    connective: '마셔서',
+    rule: 'Động từ "마시다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '오늘 아침에 [ _____ ] 원두커피 향이 아주 좋았어요.',
+    sentenceVi: 'Mùi hương của ly cà phê tôi đã uống sáng nay rất thơm.',
+  },
+  {
+    base: '배우다',
+    meaningVi: 'học',
+    past: '배운',
+    present: '배우는',
+    future: '배울',
+    connective: '배워서',
+    rule: 'Động từ "배우다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '지난 학기에 [ _____ ] 한국어 문법을 복습하고 있어요.',
+    sentenceVi: 'Tôi đang ôn tập lại các ngữ pháp tiếng Hàn đã học ở học kỳ trước.',
+  },
+  {
+    base: '가다',
+    meaningVi: 'đi',
+    past: '간',
+    present: '가는',
+    future: '갈',
+    connective: '가서',
+    rule: 'Động từ "가다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '작년에 가족과 함께 [ _____ ] 제주도 바다가 그립네요.',
+    sentenceVi: 'Tôi nhớ bờ biển đảo Jeju nơi tôi đã đi cùng gia đình năm ngoái.',
+  },
+  {
+    base: '돕다',
+    meaningVi: 'giúp đỡ',
+    past: '도운',
+    present: '돕는',
+    future: '도울',
+    connective: '도와서',
+    rule: 'Bất quy tắc "ㅂ": "돕다" biến đổi thành "도우" kết hợp với "-ㄴ" thành "도운"',
+    sentence: '어려울 때 나를 [ _____ ] 고마운 분께 편지를 썼어요.',
+    sentenceVi: 'Tôi đã viết thư gửi người tốt bụng đã giúp đỡ tôi lúc khó khăn.',
+  },
+  {
+    base: '쓰다',
+    meaningVi: 'viết',
+    past: '쓴',
+    present: '쓰는',
+    future: '쓸',
+    connective: '써서',
+    rule: 'Động từ "쓰다" không có patchim kết hợp với "-ㄴ"',
+    sentence: '선생님께 [ _____ ] 감사 편지를 우체통에 넣었어요.',
+    sentenceVi: 'Tôi đã bỏ lá thư cảm ơn đã viết cho thầy cô vào hòm thư.',
+  },
+];
+
+// Call Google Gemini AI to generate completely dynamic, non-repeating TOPIK questions
+async function generateGeminiAIQuestions({
+  apiKey,
+  targetGrammars,
+  count,
+}: {
+  apiKey: string;
+  targetGrammars: any[];
+  count: number;
+}) {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+
+    const grammarBrief = targetGrammars
+      .map(
+        (g, idx) =>
+          `${idx + 1}. Cấu trúc: "${g.structure}" - Ý nghĩa: "${g.meaning}" - Cách dùng: "${
+            g.usage || ''
+          }" - Công thức: "${g.formation || ''}" - Ví dụ: "${g.exampleKorean}" (${
+            g.exampleVietnamese
+          })`
+      )
+      .join('\n');
+
+    const prompt = `Bạn là chuyên gia giáo dục và khảo thí tiếng Hàn TOPIK cao cấp.
+Nhiệm vụ: Hãy tạo ra đúng ${count} câu hỏi trắc nghiệm kiểm tra ngữ pháp tiếng Hàn chất lượng cao cho người học.
+
+Danh sách ngữ pháp trọng tâm:
+${grammarBrief}
+
+YÊU CẦU NGHIÊM NGẶT:
+1. MỖI CÂU HỎI TRONG ${count} CÂU PHẢI HOÀN TOÀN KHÁC NHAU VỀ NGỮ CẢNH, ĐỘNG TỪ VÀ CHỦ ĐỀ (không được lặp lại câu văn hoặc động từ giống nhau).
+2. Tận dụng đa dạng chủ đề cuộc sống tự nhiên: công việc, trường học, gia đình, du lịch, ăn uống, sở thích, thời tiết...
+3. Các dạng câu hỏi phong phú:
+   - Dạng 1: Điền dạng chia đúng của động từ vào chỗ trống [ _____ ] trong câu (thử thách patchim, bất quy tắc ㄷ, ㅂ, ㅅ, ㄹ...).
+   - Dạng 2: Cho câu tiếng Hàn hoàn chỉnh, hỏi cấu trúc ngữ pháp nào đã được áp dụng và ý nghĩa là gì.
+   - Dạng 3: Cho câu tiếng Việt, chọn câu tiếng Hàn biểu đạt chuẩn xác và tự nhiên nhất.
+   - Dạng 4: Chọn câu sử dụng đúng ngữ pháp nhất trong 4 câu ví dụ thực tế.
+4. Mỗi câu hỏi gồm đủ 4 phương án trắc nghiệm A, B, C, D độc lập, trong đó chỉ có 1 phương án đúng.
+5. Giải thích (explanation) phải chi tiết bằng tiếng Việt: vì sao đúng, phân tích nguyên tắc chia và mẹo ghi nhớ.
+
+Định dạng trả về: JSON thuần túy (Mảng JSON gồm ${count} phần tử) với schema:
+[
+  {
+    "id": "q_1",
+    "type": 7,
+    "typeName": "Điền cấu trúc ngữ pháp vào câu",
+    "question": "어제 시장에서 [ _____ ] 사과가 아주 달고 맛있었어요.",
+    "instruction": "Nghĩa câu: 'Quả táo tôi đã mua ở chợ hôm qua rất ngọt và ngon'. Điền dạng chia đúng:",
+    "options": ["산", "사는", "살", "사서"],
+    "correctAnswer": "산",
+    "explanation": "Động từ '사다' (mua) không có patchim, khi kết hợp với định ngữ quá khứ '-(으)ㄴ' tạo thành '산' (đã mua).",
+    "relatedVocabOrGrammar": "${targetGrammars[0]?.structure || 'Ngữ pháp'}"
+  }
+]
+CHỈ TRẢ VỀ JSON HỢP LỆ, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC NGOÀI JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const responseText = response.text?.trim() || '';
+    if (!responseText) return null;
+
+    const parsed = JSON.parse(responseText);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.slice(0, count);
+    }
+    return null;
+  } catch (err) {
+    console.warn('Lỗi gọi Gemini AI tạo câu hỏi (chuyển sang bộ sinh động thông minh):', err);
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -139,29 +355,55 @@ export async function GET(request: NextRequest) {
       grammarWhere.lessonId = lessonId;
     }
 
-    // Fetch target items for the selected filter, plus a global pool for realistic distractors
-    const [targetVocabs, targetGrammars, globalVocabs, globalGrammars] = await Promise.all([
-      prisma.vocabulary.findMany({ where: vocabWhere }),
-      prisma.grammar.findMany({ where: grammarWhere }),
-      prisma.vocabulary.findMany({ take: 60, orderBy: { createdAt: 'desc' } }),
-      prisma.grammar.findMany({ take: 60, orderBy: { createdAt: 'desc' } }),
-    ]);
+    // Fetch target items, global pool, and user settings for Gemini API Key
+    const [targetVocabs, targetGrammars, globalVocabs, globalGrammars, userSetting] =
+      await Promise.all([
+        prisma.vocabulary.findMany({ where: vocabWhere }),
+        prisma.grammar.findMany({ where: grammarWhere }),
+        prisma.vocabulary.findMany({ take: 60, orderBy: { createdAt: 'desc' } }),
+        prisma.grammar.findMany({ take: 60, orderBy: { createdAt: 'desc' } }),
+        prisma.userSetting.findUnique({ where: { id: 'default-user' } }),
+      ]);
 
     // Validation
     if (targetVocabs.length === 0 && targetGrammars.length === 0) {
       return NextResponse.json(
         {
-          error: 'Bài học hoặc chủ đề này hiện chưa có từ vựng hoặc ngữ pháp nào để tạo bài kiểm tra.',
+          error:
+            'Bài học hoặc chủ đề này hiện chưa có từ vựng hoặc ngữ pháp nào để tạo bài kiểm tra.',
         },
         { status: 400 }
       );
     }
 
-    const questions: any[] = [];
     const questionCount = Math.min(countParam, 30);
-
-    // Helpers
     const shuffle = <T>(array: T[]): T[] => array.slice().sort(() => Math.random() - 0.5);
+
+    // =========================================================================
+    // 1. AI-POWERED GENERATION (KHI BÀI HỌC CÓ NGỮ PHÁP & CÓ API KEY HOẶC CẦN SINH ĐỀ AI)
+    // =========================================================================
+    const geminiKey = process.env.GEMINI_API_KEY || userSetting?.geminiApiKey;
+    if (geminiKey && targetGrammars.length > 0) {
+      const aiQuestions = await generateGeminiAIQuestions({
+        apiKey: geminiKey,
+        targetGrammars,
+        count: questionCount,
+      });
+
+      if (aiQuestions && aiQuestions.length >= questionCount) {
+        return NextResponse.json({
+          title: `Bài kiểm tra Ngữ pháp AI (Tạo động bởi Gemini)`,
+          total: aiQuestions.length,
+          isAIGenerated: true,
+          questions: aiQuestions,
+        });
+      }
+    }
+
+    // =========================================================================
+    // 2. DYNAMIC PROCEDURAL GENERATOR (ĐẢM BẢO KHÔNG BAO GIỜ TRÙNG LẶP CÂU HỎI)
+    // =========================================================================
+    const questions: any[] = [];
 
     // Distractor generators
     const getGrammarMeaningDistractors = (correct: string): string[] => {
@@ -201,282 +443,199 @@ export async function GET(request: NextRequest) {
       return shuffle(Array.from(new Set(filtered))).slice(0, 3);
     };
 
-    // Determine types to generate based on available data
-    let typesToUse: number[] = [];
-    const requestedType = typeParam !== 'all' ? parseInt(typeParam) : null;
-
-    if (requestedType) {
-      if ([1, 2, 3, 4, 5].includes(requestedType)) {
-        if (targetVocabs.length > 0) {
-          typesToUse = [requestedType];
-        } else if (targetGrammars.length > 0) {
-          // If lesson has NO vocabulary but has grammar, adapt intelligently to grammar types!
-          typesToUse = [6, 7, 8];
-        }
-      } else if ([6, 7, 8].includes(requestedType)) {
-        if (targetGrammars.length > 0) {
-          typesToUse = [requestedType];
-        } else if (targetVocabs.length > 0) {
-          typesToUse = [1, 2, 3];
-        }
-      }
-    } else {
-      // typeParam === 'all'
-      if (targetVocabs.length > 0 && targetGrammars.length > 0) {
-        typesToUse = [1, 2, 3, 4, 5, 6, 7, 8];
-      } else if (targetGrammars.length > 0) {
-        // Lesson has ONLY grammar: use all rich grammar question varieties!
-        typesToUse = [6, 7, 8, 9, 10];
-      } else {
-        // Lesson has ONLY vocabulary
-        typesToUse = [1, 2, 3, 4, 5];
-      }
-    }
-
-    if (typesToUse.length === 0) {
-      typesToUse = targetGrammars.length > 0 ? [6, 7, 8] : [1, 2, 3];
-    }
+    // Shuffled dynamic verb list so every question in the loop uses a fresh verb & scenario
+    const shuffledVerbTemplates = shuffle(DYNAMIC_VERB_TEMPLATES);
 
     for (let i = 0; i < questionCount; i++) {
-      const qType = typesToUse[i % typesToUse.length];
+      const targetGrammar =
+        targetGrammars.length > 0 ? targetGrammars[i % targetGrammars.length] : null;
+      const targetVocab =
+        targetVocabs.length > 0 ? targetVocabs[i % targetVocabs.length] : null;
 
-      // ================= VOCABULARY QUESTION TYPES =================
-      if (qType === 1 && targetVocabs.length > 0) {
-        // 1. Tiếng Hàn -> Chọn nghĩa tiếng Việt
-        const target = targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-        const distractors = getVocabDistractors(target.vietnamese, false);
-        const options = shuffle([target.vietnamese, ...distractors]);
+      // When the lesson has ONLY grammar (or user picked grammar practice)
+      if (targetGrammar && (targetVocabs.length === 0 || [6, 7, 8].includes(parseInt(typeParam)))) {
+        // Pick a unique dynamic verb scenario for this question index
+        const verbTemplate = shuffledVerbTemplates[i % shuffledVerbTemplates.length];
+        const subType = i % 5;
 
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 1,
-          typeName: 'Tiếng Hàn → Chọn nghĩa tiếng Việt',
-          question: target.korean,
-          instruction: 'Chọn nghĩa tiếng Việt chính xác của từ tiếng Hàn trên:',
-          options,
-          correctAnswer: target.vietnamese,
-          explanation: `"${target.korean}" (${target.partOfSpeech}) nghĩa là "${target.vietnamese}". ${
-            target.exampleKorean ? `Ví dụ: ${target.exampleKorean} (${target.exampleVietnamese})` : ''
-          }`,
-          relatedVocabOrGrammar: target.korean,
-        });
-      } else if (qType === 2 && targetVocabs.length > 0) {
-        // 2. Tiếng Việt -> Chọn từ tiếng Hàn
-        const target = targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-        const distractors = getVocabDistractors(target.korean, true);
-        const options = shuffle([target.korean, ...distractors]);
+        // Sub-type 0: Điền dạng chia ngữ pháp vào câu theo động từ cụ thể (Dạng 7 cao cấp)
+        if (subType === 0) {
+          const distractors = shuffle([
+            verbTemplate.present,
+            verbTemplate.future,
+            verbTemplate.connective,
+          ]);
+          const options = shuffle([verbTemplate.past, ...distractors]);
 
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 2,
-          typeName: 'Tiếng Việt → Chọn từ tiếng Hàn',
-          question: target.vietnamese,
-          instruction: 'Chọn từ tiếng Hàn tương ứng với nghĩa trên:',
-          options,
-          correctAnswer: target.korean,
-          explanation: `Nghĩa "${target.vietnamese}" trong tiếng Hàn là "${target.korean}". ${
-            target.hanja ? `Phiên âm/Hán: ${target.hanja}.` : ''
-          }`,
-          relatedVocabOrGrammar: target.korean,
-        });
-      } else if (qType === 3 && targetVocabs.length > 0) {
-        // 3. Điền từ còn thiếu vào câu
-        const candidates = targetVocabs.filter(
-          (v) => v.exampleKorean && v.exampleKorean.includes(v.korean)
-        );
-        const target =
-          candidates.length > 0
-            ? candidates[Math.floor(Math.random() * candidates.length)]
-            : targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-
-        let maskedSentence = target.exampleKorean || `${target.korean}을/를 공부합니다.`;
-        if (target.exampleKorean && target.exampleKorean.includes(target.korean)) {
-          maskedSentence = target.exampleKorean.replace(target.korean, '[ _____ ]');
-        } else {
-          maskedSentence = `[ _____ ] (Dịch nghĩa: ${target.vietnamese})`;
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 7,
+            typeName: 'Điền dạng chia ngữ pháp vào câu',
+            question: verbTemplate.sentence,
+            instruction: `Nghĩa câu: "${verbTemplate.sentenceVi}". Hãy chọn dạng chia đúng của động từ "${verbTemplate.base}" (${verbTemplate.meaningVi}):`,
+            options,
+            correctAnswer: verbTemplate.past,
+            explanation: `Từ cần điền là "${verbTemplate.past}". Quy tắc: ${verbTemplate.rule}. Câu hoàn chỉnh: ${verbTemplate.sentence.replace('[ _____ ]', verbTemplate.past)}`,
+            relatedVocabOrGrammar: targetGrammar.structure,
+          });
         }
+        // Sub-type 1: Nhận biết ý nghĩa và công dụng ngữ pháp (Dạng 6)
+        else if (subType === 1) {
+          const distractors = getGrammarMeaningDistractors(targetGrammar.meaning);
+          const options = shuffle([targetGrammar.meaning, ...distractors]);
 
-        const distractors = getVocabDistractors(target.korean, true);
-        const options = shuffle([target.korean, ...distractors]);
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 6,
+            typeName: 'Trắc nghiệm nhận biết ngữ pháp',
+            question: `Cấu trúc: ${targetGrammar.structure}`,
+            instruction: 'Chọn ý nghĩa và công dụng đúng của cấu trúc ngữ pháp trên:',
+            options,
+            correctAnswer: targetGrammar.meaning,
+            explanation: `Ngữ pháp "${targetGrammar.structure}": ${targetGrammar.meaning}. ${
+              targetGrammar.usage ? `Cách dùng: ${targetGrammar.usage}. ` : ''
+            }${targetGrammar.formation ? `Công thức: ${targetGrammar.formation}.` : ''}`,
+            relatedVocabOrGrammar: targetGrammar.structure,
+          });
+        }
+        // Sub-type 2: Chọn câu tiếng Hàn áp dụng chuẩn xác ngữ pháp (Dạng 8)
+        else if (subType === 2) {
+          const correctSentence = verbTemplate.sentence.replace('[ _____ ]', verbTemplate.past);
+          const distractors = getGrammarExampleDistractors(correctSentence);
+          const options = shuffle([correctSentence, ...distractors]);
 
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 3,
-          typeName: 'Điền từ còn thiếu vào câu',
-          question: maskedSentence,
-          instruction: `Nghĩa câu: "${target.exampleVietnamese || target.vietnamese}". Điền từ thích hợp vào chỗ trống:`,
-          options,
-          correctAnswer: target.korean,
-          explanation: `Từ cần điền là "${target.korean}". Câu hoàn chỉnh: ${
-            target.exampleKorean || target.korean
-          } (${target.exampleVietnamese || target.vietnamese})`,
-          relatedVocabOrGrammar: target.korean,
-        });
-      } else if (qType === 4 && targetVocabs.length > 0) {
-        // 4. Viết nghĩa tiếng Việt (tự gõ)
-        const target = targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 4,
-          typeName: 'Viết nghĩa tiếng Việt',
-          question: target.korean,
-          instruction: `Hãy tự gõ nghĩa tiếng Việt của từ "${target.korean}" (${target.partOfSpeech}):`,
-          correctAnswer: target.vietnamese,
-          explanation: `Từ "${target.korean}" có nghĩa là: "${target.vietnamese}". ${
-            target.notes ? `Ghi chú: ${target.notes}` : ''
-          }`,
-          relatedVocabOrGrammar: target.korean,
-        });
-      } else if (qType === 5 && targetVocabs.length > 0) {
-        // 5. Nhìn nghĩa tiếng Việt và tự gõ tiếng Hàn
-        const target = targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 5,
-          typeName: 'Nhìn nghĩa tiếng Việt & Gõ từ tiếng Hàn',
-          question: target.vietnamese,
-          instruction: `Hãy gõ từ tiếng Hàn tương ứng với nghĩa "${target.vietnamese}" (${target.partOfSpeech}):`,
-          correctAnswer: target.korean,
-          explanation: `Đáp án chính xác là: "${target.korean}". ${
-            target.hanja ? `Phiên âm: ${target.hanja}.` : ''
-          }`,
-          relatedVocabOrGrammar: target.korean,
-        });
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 8,
+            typeName: 'Chọn câu sử dụng ngữ pháp đúng',
+            question: `Cấu trúc: ${targetGrammar.structure} (${targetGrammar.meaning})`,
+            instruction: `Chọn câu tiếng Hàn diễn đạt đúng ý: "${verbTemplate.sentenceVi}":`,
+            options,
+            correctAnswer: correctSentence,
+            explanation: `Câu đúng là: "${correctSentence}". Áp dụng cấu trúc ${targetGrammar.structure} với động từ "${verbTemplate.base}": ${verbTemplate.rule}.`,
+            relatedVocabOrGrammar: targetGrammar.structure,
+          });
+        }
+        // Sub-type 3: Ý nghĩa tiếng Việt ➔ Chọn cấu trúc tiếng Hàn tương ứng (Dạng 6 đảo)
+        else if (subType === 3) {
+          const distractors = getGrammarStructureDistractors(targetGrammar.structure);
+          const options = shuffle([targetGrammar.structure, ...distractors]);
+
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 6,
+            typeName: 'Ý nghĩa → Chọn cấu trúc ngữ pháp',
+            question: `Ý nghĩa: "${targetGrammar.meaning}"`,
+            instruction: 'Chọn cấu trúc ngữ pháp tiếng Hàn biểu thị ý nghĩa trên:',
+            options,
+            correctAnswer: targetGrammar.structure,
+            explanation: `Cấu trúc mang ý nghĩa "${targetGrammar.meaning}" là "${targetGrammar.structure}". Ví dụ: ${targetGrammar.exampleKorean} (${targetGrammar.exampleVietnamese})`,
+            relatedVocabOrGrammar: targetGrammar.structure,
+          });
+        }
+        // Sub-type 4: Xác định cấu trúc ngữ pháp trong câu ví dụ (Dạng 7)
+        else {
+          const distractors = getGrammarStructureDistractors(targetGrammar.structure);
+          const options = shuffle([targetGrammar.structure, ...distractors]);
+
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 7,
+            typeName: 'Điền cấu trúc ngữ pháp vào câu',
+            question: `Ví dụ: ${targetGrammar.exampleKorean}`,
+            instruction: `Câu trên biểu đạt ý nghĩa: "${targetGrammar.exampleVietnamese}". Ngữ pháp trọng tâm là:`,
+            options,
+            correctAnswer: targetGrammar.structure,
+            explanation: `Cấu trúc được sử dụng trong câu là "${targetGrammar.structure}". Ý nghĩa: ${targetGrammar.meaning}.`,
+            relatedVocabOrGrammar: targetGrammar.structure,
+          });
+        }
       }
 
-      // ================= GRAMMAR QUESTION TYPES =================
-      else if (qType === 6 && targetGrammars.length > 0) {
-        // 6. Trắc nghiệm nhận biết ý nghĩa ngữ pháp
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarMeaningDistractors(target.meaning);
-        const options = shuffle([target.meaning, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 6,
-          typeName: 'Trắc nghiệm nhận biết ngữ pháp',
-          question: `Cấu trúc: ${target.structure}`,
-          instruction: 'Chọn ý nghĩa và công dụng đúng của cấu trúc ngữ pháp trên:',
-          options,
-          correctAnswer: target.meaning,
-          explanation: `Ngữ pháp "${target.structure}": ${target.meaning}. ${
-            target.usage ? `Cách dùng: ${target.usage}. ` : ''
-          }${target.formation ? `Công thức: ${target.formation}.` : ''}`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (qType === 7 && targetGrammars.length > 0) {
-        // 7. Xác định cấu trúc ngữ pháp trong câu
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarStructureDistractors(target.structure);
-        const options = shuffle([target.structure, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 7,
-          typeName: 'Điền cấu trúc ngữ pháp vào câu',
-          question: `Ví dụ: ${target.exampleKorean}`,
-          instruction: `Câu trên biểu đạt ý nghĩa: "${target.exampleVietnamese}". Ngữ pháp trọng tâm là:`,
-          options,
-          correctAnswer: target.structure,
-          explanation: `Cấu trúc được sử dụng trong câu là "${target.structure}". Công thức: ${target.formation || 'Xem phần sổ tay ngữ pháp'}.`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (qType === 8 && targetGrammars.length > 0) {
-        // 8. Chọn câu sử dụng ngữ pháp đúng
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarExampleDistractors(target.exampleKorean);
-        const options = shuffle([target.exampleKorean, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 8,
-          typeName: 'Chọn câu sử dụng ngữ pháp đúng',
-          question: `Cấu trúc: ${target.structure} (${target.meaning})`,
-          instruction: 'Chọn câu tiếng Hàn sử dụng chuẩn xác cấu trúc ngữ pháp trên:',
-          options,
-          correctAnswer: target.exampleKorean,
-          explanation: `Câu đúng là: "${target.exampleKorean}" (Nghĩa: ${target.exampleVietnamese}). Cấu trúc "${target.structure}" có cách kết hợp: ${target.formation || ''}.`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (qType === 9 && targetGrammars.length > 0) {
-        // 9. Ý nghĩa tiếng Việt → Chọn cấu trúc tiếng Hàn tương ứng
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarStructureDistractors(target.structure);
-        const options = shuffle([target.structure, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 6,
-          typeName: 'Ý nghĩa → Chọn cấu trúc ngữ pháp',
-          question: `Ý nghĩa: "${target.meaning}"`,
-          instruction: 'Chọn cấu trúc ngữ pháp tiếng Hàn biểu thị ý nghĩa trên:',
-          options,
-          correctAnswer: target.structure,
-          explanation: `Cấu trúc mang ý nghĩa "${target.meaning}" là "${target.structure}". Ví dụ: ${target.exampleKorean} (${target.exampleVietnamese})`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (qType === 10 && targetGrammars.length > 0) {
-        // 10. Điền cấu trúc ngữ pháp vào câu ví dụ (ẩn phần ngữ pháp)
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarStructureDistractors(target.structure);
-        const options = shuffle([target.structure, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 7,
-          typeName: 'Điền cấu trúc ngữ pháp vào câu',
-          question: `Câu: "${target.exampleKorean}"`,
-          instruction: `Câu trên có nghĩa: "${target.exampleVietnamese}". Ngữ pháp nào đã được áp dụng trong câu?`,
-          options,
-          correctAnswer: target.structure,
-          explanation: `Đáp án đúng là "${target.structure}". Nghĩa: ${target.meaning}. Công thức: ${target.formation || ''}`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (targetGrammars.length > 0) {
-        // Fallback to Grammar Type 6
-        const target = targetGrammars[Math.floor(Math.random() * targetGrammars.length)];
-        const distractors = getGrammarMeaningDistractors(target.meaning);
-        const options = shuffle([target.meaning, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 6,
-          typeName: 'Trắc nghiệm nhận biết ngữ pháp',
-          question: `Cấu trúc: ${target.structure}`,
-          instruction: 'Chọn ý nghĩa và công dụng đúng của cấu trúc ngữ pháp trên:',
-          options,
-          correctAnswer: target.meaning,
-          explanation: `Ngữ pháp "${target.structure}": ${target.meaning}.`,
-          relatedVocabOrGrammar: target.structure,
-        });
-      } else if (targetVocabs.length > 0) {
-        // Fallback to Vocab Type 1
-        const target = targetVocabs[Math.floor(Math.random() * targetVocabs.length)];
-        const distractors = getVocabDistractors(target.vietnamese, false);
-        const options = shuffle([target.vietnamese, ...distractors]);
-
-        questions.push({
-          id: `q_${i + 1}`,
-          type: 1,
-          typeName: 'Tiếng Hàn → Chọn nghĩa tiếng Việt',
-          question: target.korean,
-          instruction: 'Chọn nghĩa tiếng Việt chính xác của từ tiếng Hàn trên:',
-          options,
-          correctAnswer: target.vietnamese,
-          explanation: `"${target.korean}" (${target.partOfSpeech}) nghĩa là "${target.vietnamese}".`,
-          relatedVocabOrGrammar: target.korean,
-        });
+      // When the lesson has Vocabulary
+      else if (targetVocab) {
+        const vType = (i % 5) + 1;
+        if (vType === 1) {
+          const distractors = getVocabDistractors(targetVocab.vietnamese, false);
+          const options = shuffle([targetVocab.vietnamese, ...distractors]);
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 1,
+            typeName: 'Tiếng Hàn → Chọn nghĩa tiếng Việt',
+            question: targetVocab.korean,
+            instruction: 'Chọn nghĩa tiếng Việt chính xác của từ tiếng Hàn trên:',
+            options,
+            correctAnswer: targetVocab.vietnamese,
+            explanation: `"${targetVocab.korean}" (${targetVocab.partOfSpeech}) nghĩa là "${targetVocab.vietnamese}".`,
+            relatedVocabOrGrammar: targetVocab.korean,
+          });
+        } else if (vType === 2) {
+          const distractors = getVocabDistractors(targetVocab.korean, true);
+          const options = shuffle([targetVocab.korean, ...distractors]);
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 2,
+            typeName: 'Tiếng Việt → Chọn từ tiếng Hàn',
+            question: targetVocab.vietnamese,
+            instruction: 'Chọn từ tiếng Hàn tương ứng với nghĩa trên:',
+            options,
+            correctAnswer: targetVocab.korean,
+            explanation: `Nghĩa "${targetVocab.vietnamese}" trong tiếng Hàn là "${targetVocab.korean}".`,
+            relatedVocabOrGrammar: targetVocab.korean,
+          });
+        } else if (vType === 3) {
+          let maskedSentence = targetVocab.exampleKorean || `${targetVocab.korean}을/를 공부합니다.`;
+          if (targetVocab.exampleKorean && targetVocab.exampleKorean.includes(targetVocab.korean)) {
+            maskedSentence = targetVocab.exampleKorean.replace(targetVocab.korean, '[ _____ ]');
+          } else {
+            maskedSentence = `[ _____ ] (Dịch: ${targetVocab.vietnamese})`;
+          }
+          const distractors = getVocabDistractors(targetVocab.korean, true);
+          const options = shuffle([targetVocab.korean, ...distractors]);
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 3,
+            typeName: 'Điền từ còn thiếu vào câu',
+            question: maskedSentence,
+            instruction: `Nghĩa câu: "${targetVocab.exampleVietnamese || targetVocab.vietnamese}". Điền từ thích hợp vào chỗ trống:`,
+            options,
+            correctAnswer: targetVocab.korean,
+            explanation: `Từ cần điền là "${targetVocab.korean}".`,
+            relatedVocabOrGrammar: targetVocab.korean,
+          });
+        } else if (vType === 4) {
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 4,
+            typeName: 'Viết nghĩa tiếng Việt',
+            question: targetVocab.korean,
+            instruction: `Hãy tự gõ nghĩa tiếng Việt của từ "${targetVocab.korean}" (${targetVocab.partOfSpeech}):`,
+            correctAnswer: targetVocab.vietnamese,
+            explanation: `Từ "${targetVocab.korean}" có nghĩa là: "${targetVocab.vietnamese}".`,
+            relatedVocabOrGrammar: targetVocab.korean,
+          });
+        } else {
+          questions.push({
+            id: `q_${i + 1}`,
+            type: 5,
+            typeName: 'Nhìn nghĩa Việt & Gõ từ tiếng Hàn',
+            question: targetVocab.vietnamese,
+            instruction: `Hãy gõ từ tiếng Hàn tương ứng với nghĩa "${targetVocab.vietnamese}" (${targetVocab.partOfSpeech}):`,
+            correctAnswer: targetVocab.korean,
+            explanation: `Đáp án chính xác là: "${targetVocab.korean}".`,
+            relatedVocabOrGrammar: targetVocab.korean,
+          });
+        }
       }
     }
 
     return NextResponse.json({
       title:
-        typeParam === 'all'
-          ? targetVocabs.length === 0
-            ? 'Bài kiểm tra chuyên đề Ngữ pháp'
-            : 'Bài kiểm tra tổng hợp'
-          : `Bài kiểm tra dạng ${typeParam}`,
+        targetVocabs.length === 0
+          ? 'Bài kiểm tra chuyên đề Ngữ pháp'
+          : 'Bài kiểm tra tổng hợp',
       total: questions.length,
+      isAIGenerated: false,
       questions,
     });
   } catch (error) {

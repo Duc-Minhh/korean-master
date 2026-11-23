@@ -39,6 +39,7 @@ export async function PUT(request: NextRequest) {
         ...(body.targetWordsPerDay !== undefined && { targetWordsPerDay: Number(body.targetWordsPerDay) }),
         ...(body.targetReviewPerDay !== undefined && { targetReviewPerDay: Number(body.targetReviewPerDay) }),
         ...(body.theme && { theme: body.theme }),
+        ...(body.geminiApiKey !== undefined && { geminiApiKey: body.geminiApiKey ? body.geminiApiKey.trim() : null }),
       },
       create: {
         id: 'default-user',
@@ -46,6 +47,7 @@ export async function PUT(request: NextRequest) {
         targetWordsPerDay: Number(body.targetWordsPerDay) || 10,
         targetReviewPerDay: Number(body.targetReviewPerDay) || 15,
         theme: body.theme || 'light',
+        geminiApiKey: body.geminiApiKey ? body.geminiApiKey.trim() : null,
       },
     });
 
