@@ -603,7 +603,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 <option value="all">Tất cả chủ đề</option>
                 {topics.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {t.name} ({t._count?.vocabularies || 0} từ • {t._count?.grammars || 0} ngữ pháp)
                   </option>
                 ))}
               </select>
@@ -621,12 +621,34 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 <option value="all">Tất cả bài học</option>
                 {lessons.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.title}
+                    {l.title} ({l._count?.vocabularies || 0} từ • {l._count?.grammars || 0} ngữ pháp)
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/* Smart Tip when selected lesson has only grammar */}
+          {(() => {
+            const currentLesson = lessons.find((l) => l.id === selectedLesson);
+            if (
+              currentLesson &&
+              (currentLesson._count?.vocabularies || 0) === 0 &&
+              (currentLesson._count?.grammars || 0) > 0
+            ) {
+              return (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-800 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    Bài học <strong>"{currentLesson.title}"</strong> có{' '}
+                    <strong>{currentLesson._count?.grammars} cấu trúc ngữ pháp</strong>. Hệ thống sẽ
+                    tự động tạo bộ câu hỏi trắc nghiệm chuyên sâu về ngữ pháp cho bạn ôn tập!
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {/* Start Test Button */}
           <div className="pt-2 flex justify-end">
