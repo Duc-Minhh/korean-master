@@ -197,9 +197,6 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Luyện tập và Kiểm tra kiến thức
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Kiểm tra toàn diện từ vựng, ngữ pháp, ghép câu và luyện gõ tiếng Hàn từ chính dữ liệu bạn đã nhập.
-            </p>
           </div>
 
           <button
@@ -566,9 +563,6 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
         <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-soft space-y-6">
           <div>
             <h2 className="text-base font-bold text-slate-900">Chọn chế độ luyện tập & kiểm tra</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Chọn Ôn luyện Từ vựng (dạng 1-5), Ôn luyện Ngữ pháp (dạng 6-8) hoặc Đề thi Tổng hợp 40 câu
-            </p>
           </div>
 
           {/* 3 Main Mode Cards */}
