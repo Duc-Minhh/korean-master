@@ -61,16 +61,50 @@ export async function DELETE(
     const type = searchParams.get('type');
 
     if (type === 'textbook') {
-      await prisma.textbook.delete({ where: { id: params.id } });
+      // Find all chapters and lessons inside this textbook
+      const chapters = await prisma.chapter.findMany({
+        where: { textbookId: params.id },
+        include: { lessons: { select: { id: true } } },
+      });
+      const lessonIds = chapters.flatMap((c) => c.lessons.map((l) => l.id));
+      const chapterIds = chapters.map((c) => c.id);
+
+      await prisma.$transaction([
+        prisma.vocabulary.deleteMany({ where: { lessonId: { in: lessonIds } } }),
+        prisma.grammar.deleteMany({ where: { lessonId: { in: lessonIds } } }),
+        prisma.lesson.deleteMany({ where: { id: { in: lessonIds } } }),
+        prisma.chapter.deleteMany({ where: { id: { in: chapterIds } } }),
+        prisma.textbook.delete({ where: { id: params.id } }),
+      ]);
     } else if (type === 'chapter') {
-      await prisma.chapter.delete({ where: { id: params.id } });
+      // Find all lessons inside this chapter
+      const lessons = await prisma.lesson.findMany({
+        where: { chapterId: params.id },
+        select: { id: true },
+      });
+      const lessonIds = lessons.map((l) => l.id);
+
+      await prisma.$transaction([
+        prisma.vocabulary.deleteMany({ where: { lessonId: { in: lessonIds } } }),
+        prisma.grammar.deleteMany({ where: { lessonId: { in: lessonIds } } }),
+        prisma.lesson.deleteMany({ where: { id: { in: lessonIds } } }),
+        prisma.chapter.delete({ where: { id: params.id } }),
+      ]);
     } else if (type === 'lesson') {
-      await prisma.lesson.delete({ where: { id: params.id } });
+      // Delete all vocabularies and grammars linked to this lesson, then delete the lesson
+      await prisma.$transaction([
+        prisma.vocabulary.deleteMany({ where: { lessonId: params.id } }),
+        prisma.grammar.deleteMany({ where: { lessonId: params.id } }),
+        prisma.lesson.delete({ where: { id: params.id } }),
+      ]);
     } else {
       return NextResponse.json({ error: 'Thiếu hoặc sai loại đối tượng' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: 'Đã xóa thành công' });
+    return NextResponse.json({
+      success: true,
+      message: 'Đã xóa thành công cùng toàn bộ từ vựng và ngữ pháp liên kết',
+    });
   } catch (error) {
     console.error('Lỗi xóa curriculum:', error);
     return NextResponse.json({ error: 'Không thể xóa' }, { status: 500 });

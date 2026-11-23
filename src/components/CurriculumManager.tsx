@@ -124,8 +124,27 @@ export default function CurriculumManager() {
     }
   };
 
-  const handleDeleteItem = async (type: 'textbook' | 'chapter' | 'lesson', id: string, name: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa "${name}"? Tất cả nội dung con bên trong cũng sẽ bị ảnh hưởng.`)) {
+  const handleDeleteItem = async (
+    type: 'textbook' | 'chapter' | 'lesson',
+    id: string,
+    name: string,
+    counts?: { vocabCount?: number; grammarCount?: number }
+  ) => {
+    let confirmMsg = `Bạn có chắc chắn muốn xóa "${name}"?`;
+    if (type === 'lesson') {
+      const vText = counts?.vocabCount ? `${counts.vocabCount} từ vựng` : '';
+      const gText = counts?.grammarCount ? `${counts.grammarCount} ngữ pháp` : '';
+      const detail = [vText, gText].filter(Boolean).join(' và ');
+      confirmMsg = `Bạn có chắc chắn muốn xóa bài học "${name}"?\nToàn bộ ${
+        detail ? `${detail} thuộc bài học này` : 'từ vựng và ngữ pháp liên kết'
+      } cũng sẽ bị xóa vĩnh viễn khỏi hệ thống!`;
+    } else if (type === 'chapter') {
+      confirmMsg = `Bạn có chắc chắn muốn xóa chương "${name}"?\nToàn bộ các bài học, từ vựng và ngữ pháp thuộc chương này sẽ bị xóa vĩnh viễn!`;
+    } else if (type === 'textbook') {
+      confirmMsg = `Bạn có chắc chắn muốn xóa giáo trình "${name}"?\nToàn bộ chương, bài học, từ vựng và ngữ pháp thuộc giáo trình này sẽ bị xóa vĩnh viễn!`;
+    }
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
@@ -134,7 +153,7 @@ export default function CurriculumManager() {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Xóa thất bại');
-      showToast('Đã xóa thành công', 'success');
+      showToast('Đã xóa thành công và dọn sạch dữ liệu liên kết', 'success');
       fetchCurriculum();
     } catch (err) {
       showToast('Lỗi khi xóa', 'error');
@@ -309,7 +328,12 @@ export default function CurriculumManager() {
                                       {ls._count?.vocabularies || 0} từ • {ls._count?.grammars || 0} ngữ pháp
                                     </span>
                                     <button
-                                      onClick={() => handleDeleteItem('lesson', ls.id, ls.title)}
+                                      onClick={() =>
+                                        handleDeleteItem('lesson', ls.id, ls.title, {
+                                          vocabCount: ls._count?.vocabularies,
+                                          grammarCount: ls._count?.grammars,
+                                        })
+                                      }
                                       className="text-slate-300 hover:text-rose-600 p-1"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
