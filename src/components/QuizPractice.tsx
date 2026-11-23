@@ -57,21 +57,18 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
     {
       id: 'vocab',
       title: '1. Ôn luyện từ vựng',
-      badge: 'Gộp Dạng 1 - 5',
       desc: 'Tổng hợp 5 dạng: Chọn nghĩa Hàn - Việt, Việt - Hàn, điền từ vào câu và luyện gõ chính tả Hangul',
       icon: BookOpen,
     },
     {
       id: 'grammar',
       title: '2. Ôn luyện ngữ pháp',
-      badge: 'Gộp Dạng 6 - 8',
       desc: 'Tổng hợp 3 dạng: Nhận biết cấu trúc, chia đuôi câu và chọn câu sử dụng ngữ pháp đúng',
       icon: Layers,
     },
     {
       id: 'all',
       title: '3. Đề tổng hợp toàn diện',
-      badge: 'Fix cứng 40 câu',
       desc: 'Đề thi hoàn chỉnh 40 câu kết hợp cả Từ vựng theo chủ đề và Ngữ pháp theo bài học',
       icon: Award,
     },
@@ -589,23 +586,14 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="mb-3">
                       <div
-                        className={`p-2.5 rounded-xl ${
+                        className={`inline-block p-2.5 rounded-xl ${
                           isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
                         }`}
                       >
                         <IconComponent className="w-5 h-5" />
                       </div>
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                          isSelected
-                            ? 'bg-blue-100 text-blue-800 border-blue-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        {mode.badge}
-                      </span>
                     </div>
                     <h4 className="font-bold text-sm sm:text-base">{mode.title}</h4>
                     <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{mode.desc}</p>
