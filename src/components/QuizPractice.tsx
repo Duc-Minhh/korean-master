@@ -194,10 +194,6 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 mb-2">
-              <Award className="w-3.5 h-3.5 text-blue-600" />
-              <span>Hệ thống Luyện tập & Đề thi Tổng hợp 40 câu</span>
-            </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Luyện tập và Kiểm tra kiến thức
             </h1>
@@ -755,34 +751,6 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                   ))}
                 </select>
               </div>
-            </div>
-          )}
-
-          {/* Smart Tips per Mode */}
-          {selectedType === 'vocab' && (
-            <div className="p-3.5 bg-blue-50 border border-blue-200/80 rounded-xl text-xs text-blue-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>
-                Chế độ <strong>Ôn luyện từ vựng</strong>: Hệ thống sẽ tự động phối hợp 5 dạng bài tập (chọn nghĩa Hàn - Việt, Việt - Hàn, điền từ vào câu ví dụ, tự gõ nghĩa và gõ tiếng Hàn) theo chủ đề bạn đã chọn.
-              </span>
-            </div>
-          )}
-
-          {selectedType === 'grammar' && (
-            <div className="p-3.5 bg-indigo-50 border border-indigo-200/80 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span>
-                Chế độ <strong>Ôn luyện ngữ pháp</strong>: Hệ thống sẽ tạo bài kiểm tra 3 dạng ngữ pháp chuyên sâu (nhận biết ý nghĩa, chia đuôi động từ vào câu và chọn câu chuẩn ngữ pháp) theo bài học bạn đã chọn.
-              </span>
-            </div>
-          )}
-
-          {selectedType === 'all' && (
-            <div className="p-3.5 bg-purple-50 border border-purple-200/80 rounded-xl text-xs text-purple-900 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
-              <span>
-                <strong>Đề thi tổng hợp hoàn chỉnh 40 câu</strong>: Kết hợp cân bằng giữa Từ vựng theo chủ đề và Ngữ pháp theo bài học đã chọn, tạo trải nghiệm thi thử TOPIK toàn diện nhất!
-              </span>
             </div>
           )}
 

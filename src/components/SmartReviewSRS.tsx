@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Brain,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -96,10 +95,6 @@ export default function SmartReviewSRS() {
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700 mb-2">
-              <Brain className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Thuật toán Lặp lại ngắt quãng (SM-2 SRS)</span>
-            </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Ôn tập thông minh (Spaced Repetition)
             </h1>

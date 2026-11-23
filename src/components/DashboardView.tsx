@@ -305,14 +305,14 @@ export default function DashboardView({
                 className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ Từ vựng</span>
+                <span>Từ vựng</span>
               </button>
               <button
                 onClick={onQuickAddGrammar}
                 className="py-2.5 px-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>+ Ngữ pháp</span>
+                <span>Ngữ pháp</span>
               </button>
             </div>
           </div>
