@@ -15,6 +15,7 @@ import {
   TrendingDown,
   Sparkles,
   BookOpen,
+  Layers,
 } from 'lucide-react';
 import { Topic, Lesson, QuizQuestion, QuizResult } from '@/types';
 import { speakKorean } from '@/lib/speech';
@@ -30,7 +31,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
   const { showToast } = useToast();
 
   // Test Config state
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('vocab');
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [selectedTopic, setSelectedTopic] = useState<string>('all');
   const [selectedLesson, setSelectedLesson] = useState<string>('all');
@@ -52,16 +53,28 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
   const [frequentMistakes, setFrequentMistakes] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const QUIZ_TYPES = [
-    { id: 'all', title: 'Đề tổng hợp (8 dạng ngẫu nhiên)', desc: 'Thử thách toàn diện từ vựng và ngữ pháp' },
-    { id: '1', title: '1. Tiếng Hàn → Chọn nghĩa tiếng Việt', desc: 'Nhận biết từ vựng qua tiếng Hàn' },
-    { id: '2', title: '2. Tiếng Việt → Chọn từ tiếng Hàn', desc: 'Hồi tưởng từ tiếng Hàn từ nghĩa tiếng Việt' },
-    { id: '3', title: '3. Điền từ còn thiếu vào câu', desc: 'Áp dụng từ vựng vào ngữ cảnh câu ví dụ' },
-    { id: '4', title: '4. Viết nghĩa tiếng Việt (Tự gõ)', desc: 'Rèn luyện khả năng dịch nghĩa chuẩn xác' },
-    { id: '5', title: '5. Nhìn nghĩa Việt & Gõ từ tiếng Hàn', desc: 'Rèn luyện kỹ năng gõ và chính tả Hangul' },
-    { id: '6', title: '6. Trắc nghiệm nhận biết ngữ pháp', desc: 'Hiểu bản chất và công dụng cấu trúc' },
-    { id: '7', title: '7. Điền cấu trúc ngữ pháp vào câu', desc: 'Chọn ngữ pháp chính xác cho ngữ cảnh câu' },
-    { id: '8', title: '8. Chọn câu sử dụng ngữ pháp đúng', desc: 'Phân biệt cách chia và trật tự câu chuẩn' },
+  const QUIZ_MODES = [
+    {
+      id: 'vocab',
+      title: '1. Ôn luyện từ vựng',
+      badge: 'Gộp Dạng 1 - 5',
+      desc: 'Tổng hợp 5 dạng: Chọn nghĩa Hàn - Việt, Việt - Hàn, điền từ vào câu và luyện gõ chính tả Hangul',
+      icon: BookOpen,
+    },
+    {
+      id: 'grammar',
+      title: '2. Ôn luyện ngữ pháp',
+      badge: 'Gộp Dạng 6 - 8',
+      desc: 'Tổng hợp 3 dạng: Nhận biết cấu trúc, chia đuôi câu và chọn câu sử dụng ngữ pháp đúng',
+      icon: Layers,
+    },
+    {
+      id: 'all',
+      title: '3. Đề tổng hợp toàn diện',
+      badge: 'Fix cứng 40 câu',
+      desc: 'Đề thi hoàn chỉnh 40 câu kết hợp cả Từ vựng theo chủ đề và Ngữ pháp theo bài học',
+      icon: Award,
+    },
   ];
 
   // Start Quiz
@@ -70,10 +83,15 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
     try {
       const params = new URLSearchParams({
         type: selectedType,
-        count: String(questionCount),
-        topicId: selectedTopic,
-        lessonId: selectedLesson,
+        count: selectedType === 'all' ? '40' : String(questionCount),
       });
+
+      if (selectedType === 'vocab' || selectedType === 'all') {
+        params.set('topicId', selectedTopic);
+      }
+      if (selectedType === 'grammar' || selectedType === 'all') {
+        params.set('lessonId', selectedLesson);
+      }
 
       const res = await fetch(`/api/quiz?${params.toString()}`);
       if (!res.ok) {
@@ -120,7 +138,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quizType: selectedType,
-          title: QUIZ_TYPES.find((t) => t.id === selectedType)?.title || 'Bài kiểm tra',
+          title: QUIZ_MODES.find((t) => t.id === selectedType)?.title || 'Bài kiểm tra',
           questions,
           userAnswers,
         }),
@@ -176,9 +194,9 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-700 mb-2">
-              <Award className="w-3.5 h-3.5 text-amber-600" />
-              <span>Hệ thống 8 Dạng Đề Kiểm Tra & Đánh Giá</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 mb-2">
+              <Award className="w-3.5 h-3.5 text-blue-600" />
+              <span>Hệ thống Luyện tập & Đề thi Tổng hợp 40 câu</span>
             </div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
               Luyện tập và Kiểm tra kiến thức
@@ -551,113 +569,222 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
         /* VIEW 4: Config & Start Quiz */
         <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-soft space-y-6">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Chọn dạng bài kiểm tra</h2>
+            <h2 className="text-base font-bold text-slate-900">Chọn chế độ luyện tập & kiểm tra</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Chọn 1 trong 8 dạng chuyên biệt hoặc làm bài thi tổng hợp ngẫu nhiên
+              Chọn Ôn luyện Từ vựng (dạng 1-5), Ôn luyện Ngữ pháp (dạng 6-8) hoặc Đề thi Tổng hợp 40 câu
             </p>
           </div>
 
-          {/* 8 Quiz Type Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {QUIZ_TYPES.map((type) => {
-              const isSelected = selectedType === type.id;
+          {/* 3 Main Mode Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {QUIZ_MODES.map((mode) => {
+              const isSelected = selectedType === mode.id;
+              const IconComponent = mode.icon;
               return (
                 <button
-                  key={type.id}
+                  key={mode.id}
                   type="button"
-                  onClick={() => setSelectedType(type.id)}
-                  className={`p-4 rounded-xl border text-left transition flex flex-col justify-between ${
+                  onClick={() => {
+                    setSelectedType(mode.id);
+                    if (mode.id === 'all') {
+                      setQuestionCount(40);
+                    } else if (questionCount === 40) {
+                      setQuestionCount(10);
+                    }
+                  }}
+                  className={`p-5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                     isSelected
-                      ? 'border-blue-600 bg-blue-50/50 text-blue-900 ring-2 ring-blue-500/20'
-                      : 'border-slate-200 hover:border-slate-300 text-slate-800'
+                      ? 'border-blue-600 bg-blue-50/60 text-blue-950 shadow-md ring-2 ring-blue-500/20'
+                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 text-slate-800'
                   }`}
                 >
                   <div>
-                    <h4 className="font-bold text-xs sm:text-sm">{type.title}</h4>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-normal">{type.desc}</p>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div
+                        className={`p-2.5 rounded-xl ${
+                          isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                          isSelected
+                            ? 'bg-blue-100 text-blue-800 border-blue-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {mode.badge}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-sm sm:text-base">{mode.title}</h4>
+                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{mode.desc}</p>
                   </div>
                   {isSelected && (
-                    <span className="mt-3 text-[10px] font-bold text-blue-600 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
-                      <span>Đang chọn</span>
-                    </span>
+                    <div className="mt-4 pt-3 border-t border-blue-200/60 text-xs font-bold text-blue-600 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Đang chọn chế độ này</span>
+                    </div>
                   )}
                 </button>
               );
             })}
           </div>
 
-          {/* Test Parameters (Count, Topic, Lesson) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-100 pt-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                Số lượng câu hỏi
-              </label>
-              <select
-                value={questionCount}
-                onChange={(e) => setQuestionCount(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-              >
-                <option value={5}>5 câu (Kiểm tra nhanh)</option>
-                <option value={10}>10 câu (Tiêu chuẩn)</option>
-                <option value={15}>15 câu (Mở rộng)</option>
-                <option value={20}>20 câu (Toàn diện)</option>
-              </select>
-            </div>
+          {/* Test Parameters (Conditional per Mode) */}
+          {selectedType === 'vocab' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Số lượng câu hỏi
+                </label>
+                <select
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value={5}>5 câu (Kiểm tra nhanh)</option>
+                  <option value={10}>10 câu (Tiêu chuẩn)</option>
+                  <option value={15}>15 câu (Mở rộng)</option>
+                  <option value={20}>20 câu (Toàn diện)</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                Lọc theo chủ đề (Từ vựng)
-              </label>
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-              >
-                <option value="all">Tất cả chủ đề</option>
-                {topics.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t._count?.vocabularies || 0} từ)
-                  </option>
-                ))}
-              </select>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Chọn chủ đề từ vựng cần làm
+                </label>
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">Tất cả chủ đề</option>
+                  {topics.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t._count?.vocabularies || 0} từ)
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                Lọc theo bài học (Ngữ pháp)
-              </label>
-              <select
-                value={selectedLesson}
-                onChange={(e) => setSelectedLesson(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-              >
-                <option value="all">Tất cả bài học</option>
-                {lessons.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.title} ({l._count?.grammars || 0} ngữ pháp)
-                  </option>
-                ))}
-              </select>
+          {selectedType === 'grammar' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Số lượng câu hỏi
+                </label>
+                <select
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value={5}>5 câu (Kiểm tra nhanh)</option>
+                  <option value={10}>10 câu (Tiêu chuẩn)</option>
+                  <option value={15}>15 câu (Mở rộng)</option>
+                  <option value={20}>20 câu (Toàn diện)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Chọn bài học ngữ pháp để làm
+                </label>
+                <select
+                  value={selectedLesson}
+                  onChange={(e) => setSelectedLesson(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">Tất cả bài học</option>
+                  {lessons.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title} ({l._count?.grammars || 0} ngữ pháp)
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Smart Tip when selected lesson has grammar */}
-          {(() => {
-            const currentLesson = lessons.find((l) => l.id === selectedLesson);
-            if (currentLesson && (currentLesson._count?.grammars || 0) > 0) {
-              return (
-                <div className="p-3.5 bg-indigo-50 border border-indigo-200/80 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>
-                    Bài học <strong>"{currentLesson.title}"</strong> có{' '}
-                    <strong>{currentLesson._count?.grammars} cấu trúc ngữ pháp</strong>. Hệ thống sẽ tự động tạo bộ câu hỏi trắc nghiệm ngữ pháp đa dạng, không trùng lặp cho bạn ôn tập!
-                  </span>
+          {selectedType === 'all' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-100 pt-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Số lượng câu hỏi
+                </label>
+                <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-indigo-700 flex items-center justify-between">
+                  <span>40 câu hoàn chỉnh</span>
+                  <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">Cố định</span>
                 </div>
-              );
-            }
-            return null;
-          })()}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Chọn chủ đề từ vựng
+                </label>
+                <select
+                  value={selectedTopic}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">Tất cả chủ đề</option>
+                  {topics.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t._count?.vocabularies || 0} từ)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Chọn bài học ngữ pháp
+                </label>
+                <select
+                  value={selectedLesson}
+                  onChange={(e) => setSelectedLesson(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">Tất cả bài học</option>
+                  {lessons.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title} ({l._count?.grammars || 0} ngữ pháp)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Smart Tips per Mode */}
+          {selectedType === 'vocab' && (
+            <div className="p-3.5 bg-blue-50 border border-blue-200/80 rounded-xl text-xs text-blue-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>
+                Chế độ <strong>Ôn luyện từ vựng</strong>: Hệ thống sẽ tự động phối hợp 5 dạng bài tập (chọn nghĩa Hàn - Việt, Việt - Hàn, điền từ vào câu ví dụ, tự gõ nghĩa và gõ tiếng Hàn) theo chủ đề bạn đã chọn.
+              </span>
+            </div>
+          )}
+
+          {selectedType === 'grammar' && (
+            <div className="p-3.5 bg-indigo-50 border border-indigo-200/80 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                Chế độ <strong>Ôn luyện ngữ pháp</strong>: Hệ thống sẽ tạo bài kiểm tra 3 dạng ngữ pháp chuyên sâu (nhận biết ý nghĩa, chia đuôi động từ vào câu và chọn câu chuẩn ngữ pháp) theo bài học bạn đã chọn.
+              </span>
+            </div>
+          )}
+
+          {selectedType === 'all' && (
+            <div className="p-3.5 bg-purple-50 border border-purple-200/80 rounded-xl text-xs text-purple-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+              <span>
+                <strong>Đề thi tổng hợp hoàn chỉnh 40 câu</strong>: Kết hợp cân bằng giữa Từ vựng theo chủ đề và Ngữ pháp theo bài học đã chọn, tạo trải nghiệm thi thử TOPIK toàn diện nhất!
+              </span>
+            </div>
+          )}
 
           {/* Start Test Button */}
           <div className="pt-2 flex justify-end">
@@ -667,11 +794,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
               className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition flex items-center gap-2"
             >
               {loading ? (
-                <span>Đang khởi tạo đề...</span>
+                <span>Đang khởi tạo đề thi...</span>
               ) : (
                 <>
                   <Award className="w-4 h-4" />
-                  <span>Bắt đầu làm bài kiểm tra</span>
+                  <span>
+                    {selectedType === 'all'
+                      ? 'Bắt đầu làm Đề tổng hợp (40 câu)'
+                      : selectedType === 'vocab'
+                      ? `Bắt đầu ôn luyện từ vựng (${questionCount} câu)`
+                      : `Bắt đầu ôn luyện ngữ pháp (${questionCount} câu)`}
+                  </span>
                 </>
               )}
             </button>
