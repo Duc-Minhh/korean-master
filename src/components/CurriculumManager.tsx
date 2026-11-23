@@ -157,14 +157,14 @@ export default function CurriculumManager() {
             className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition flex items-center gap-1.5"
           >
             <Tag className="w-3.5 h-3.5" />
-            <span>+ Chủ đề mới</span>
+            <span>Chủ đề mới</span>
           </button>
           <button
             onClick={() => handleOpenAdd('textbook')}
             className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Giáo trình mới</span>
+            <span>Giáo trình mới</span>
           </button>
         </div>
       </div>
