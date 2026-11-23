@@ -15,7 +15,6 @@ import {
   Sparkles,
   Trophy,
   BookOpen,
-  GraduationCap,
   Shuffle,
   ArrowLeftRight,
   Search,
@@ -31,12 +30,12 @@ import { speakKorean } from '@/lib/speech';
 import { useToast } from './Toast';
 import confetti from 'canvas-confetti';
 
-export type DeckCategory = 'all' | 'topics' | 'lessons' | 'special';
+export type DeckCategory = 'all' | 'topics' | 'special';
 export type StudyMode = 'quiz' | 'flip'; // 'quiz': Trắc nghiệm 4 lựa chọn (Quizlet Learn), 'flip': Lật thẻ tự đánh giá
 
 export interface StudyDeck {
   id: string;
-  type: 'topic' | 'lesson' | 'special';
+  type: 'topic' | 'special';
   title: string;
   subtitle?: string;
   categoryLabel: string;
@@ -44,7 +43,6 @@ export interface StudyDeck {
   count: number;
   sampleWords?: { korean: string; vietnamese: string }[];
   topicId?: string;
-  lessonId?: string;
   specialMode?: 'all' | 'difficult' | 'new' | 'random';
   icon?: string;
 }
@@ -63,10 +61,10 @@ interface QuizOption {
 
 interface FlashcardStudyProps {
   topics: Topic[];
-  lessons: Lesson[];
+  lessons?: Lesson[];
 }
 
-export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps) {
+export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
   const { showToast } = useToast();
 
   // Active Deck: if null, show Quizlet-style Deck Library Lobby; if set, show active study room
@@ -171,34 +169,13 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
       });
     });
 
-    // 3. Lesson Decks
-    lessons.forEach((l) => {
-      const textbookTitle = l.chapter?.textbook?.title || 'Giáo trình';
-      const chapterTitle = l.chapter?.title ? ` • ${l.chapter.title}` : '';
-      list.push({
-        id: `lesson-${l.id}`,
-        type: 'lesson',
-        title: l.title,
-        subtitle: `${textbookTitle}${chapterTitle}`,
-        categoryLabel: 'Bài học',
-        categoryColor: 'bg-teal-50 text-teal-700 border-teal-200',
-        count: l._count?.vocabularies ?? 0,
-        sampleWords: l.vocabularies?.map((v) => ({
-          korean: v.korean,
-          vietnamese: v.vietnamese,
-        })),
-        lessonId: l.id,
-      });
-    });
-
     return list;
-  }, [topics, lessons]);
+  }, [topics]);
 
   // Filtered decks for display
   const filteredDecks = useMemo(() => {
     return allDecks.filter((deck) => {
       if (categoryTab === 'topics' && deck.type !== 'topic') return false;
-      if (categoryTab === 'lessons' && deck.type !== 'lesson') return false;
       if (categoryTab === 'special' && deck.type !== 'special') return false;
 
       if (searchQuery.trim()) {
@@ -241,9 +218,6 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
         if (deck.type === 'topic' && deck.topicId) {
           params.set('mode', 'topic');
           params.set('topicId', deck.topicId);
-        } else if (deck.type === 'lesson' && deck.lessonId) {
-          params.set('mode', 'lesson');
-          params.set('lessonId', deck.lessonId);
         } else if (deck.type === 'special' && deck.specialMode) {
           params.set('mode', deck.specialMode);
           if (deck.specialMode === 'random') {
@@ -677,34 +651,25 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-3 border border-blue-200/80">
-                <Layers className="w-3.5 h-3.5 text-blue-600" />
-                <span>Quizlet-Style Flashcard Decks</span>
-              </div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Bộ thẻ học Thẻ ghi nhớ
               </h1>
               <p className="text-sm text-slate-500 mt-1 max-w-xl">
-                Chọn một học phần theo <strong className="text-slate-700 font-semibold">Chủ đề</strong> hoặc{' '}
-                <strong className="text-slate-700 font-semibold">Bài học giáo trình</strong> để ôn tập trắc nghiệm chọn đáp án phản xạ nhanh hoặc lật thẻ tự đánh giá.
+                Chọn một học phần theo <strong className="text-slate-700 font-semibold">Chủ đề</strong> để ôn tập trắc nghiệm chọn đáp án phản xạ nhanh hoặc lật thẻ tự đánh giá.
               </p>
             </div>
 
             {/* Quick Metrics */}
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/60 self-start md:self-auto min-w-[280px]">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/60 self-start md:self-auto min-w-[220px]">
               <div className="text-center p-2">
                 <span className="block text-xl font-black text-blue-600">
                   {topics.reduce((acc, t) => acc + (t._count?.vocabularies || 0), 0)}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500">Từ vựng</span>
               </div>
-              <div className="text-center p-2 border-x border-slate-200/80">
+              <div className="text-center p-2 border-l border-slate-200/80">
                 <span className="block text-xl font-black text-indigo-600">{topics.length}</span>
                 <span className="text-[11px] font-semibold text-slate-500">Chủ đề</span>
-              </div>
-              <div className="text-center p-2">
-                <span className="block text-xl font-black text-teal-600">{lessons.length}</span>
-                <span className="text-[11px] font-semibold text-slate-500">Bài học</span>
               </div>
             </div>
           </div>
@@ -723,18 +688,6 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
               >
                 <BookMarked className="w-4 h-4 text-indigo-500" />
                 <span>Theo Chủ đề ({topics.length})</span>
-              </button>
-
-              <button
-                onClick={() => setCategoryTab('lessons')}
-                className={`px-3.5 py-2 rounded-xl transition flex items-center gap-2 whitespace-nowrap ${
-                  categoryTab === 'lessons'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'hover:text-slate-900'
-                }`}
-              >
-                <GraduationCap className="w-4 h-4 text-teal-500" />
-                <span>Theo Bài học ({lessons.length})</span>
               </button>
 
               <button
@@ -767,7 +720,7 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Tìm bộ thẻ, bài học, từ..."
+                placeholder="Tìm bộ thẻ, từ vựng..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition"
@@ -782,7 +735,7 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
             <BookOpen className="w-12 h-12 mx-auto text-slate-300" />
             <h3 className="text-base font-bold text-slate-700">Không tìm thấy bộ thẻ phù hợp</h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Không có chủ đề hoặc bài học nào khớp với từ khóa "{searchQuery}". Hãy thử tìm từ khóa khác hoặc tạo thêm chủ đề mới.
+              Không có chủ đề nào khớp với từ khóa "{searchQuery}". Hãy thử tìm từ khóa khác hoặc tạo thêm chủ đề mới.
             </p>
             {searchQuery && (
               <button
@@ -797,7 +750,6 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredDecks.map((deck) => {
               const isSpecial = deck.type === 'special';
-              const isTopic = deck.type === 'topic';
 
               return (
                 <div
@@ -810,9 +762,7 @@ export default function FlashcardStudy({ topics, lessons }: FlashcardStudyProps)
                     className={`absolute top-0 left-0 right-0 h-1.5 ${
                       isSpecial
                         ? 'bg-gradient-to-r from-amber-400 to-rose-500'
-                        : isTopic
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600'
-                        : 'bg-gradient-to-r from-teal-400 to-emerald-500'
+                        : 'bg-gradient-to-r from-blue-500 to-indigo-600'
                     }`}
                   />
 
