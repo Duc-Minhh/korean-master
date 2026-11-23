@@ -15,6 +15,10 @@ import {
   TrendingDown,
   Sparkles,
   BookOpen,
+  Key,
+  X,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react';
 import { Topic, Lesson, QuizQuestion, QuizResult } from '@/types';
 import { speakKorean } from '@/lib/speech';
@@ -42,6 +46,50 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
+
+  // Gemini AI state
+  const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [savingKey, setSavingKey] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.geminiApiKey) {
+          setHasGeminiKey(true);
+          setApiKeyInput(data.geminiApiKey);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingKey(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiApiKey: apiKeyInput.trim() }),
+      });
+      if (!res.ok) throw new Error('Không thể lưu API Key');
+      const data = await res.json();
+      setHasGeminiKey(Boolean(data.geminiApiKey));
+      setShowApiKeyModal(false);
+      showToast(
+        data.geminiApiKey
+          ? '✨ Đã kết nối Google Gemini AI thành công! Hệ thống sẽ dùng AI để tạo câu hỏi mới.'
+          : 'Đã lưu cấu hình (Đang dùng Bộ sinh đề động thông minh 12 động từ)',
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi lưu API Key', 'error');
+    } finally {
+      setSavingKey(false);
+    }
+  };
 
   // Result state
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
@@ -288,10 +336,15 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
                   {currentQ?.typeName}
                 </span>
-                {isAIGenerated && (
+                {isAIGenerated ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-indigo-500" />
                     <span>AI Gemini</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>Sinh đề thông minh</span>
                   </span>
                 )}
               </div>
@@ -550,11 +603,35 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
       ) : (
         /* VIEW 4: Config & Start Quiz */
         <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-soft space-y-6">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Chọn dạng bài kiểm tra</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Chọn 1 trong 8 dạng chuyên biệt hoặc làm bài thi tổng hợp ngẫu nhiên
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">Chọn dạng bài kiểm tra</h2>
+                {hasGeminiKey ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                    AI Gemini: Sẵn sàng
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    Sinh đề động (12 động từ)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Chọn 1 trong 8 dạng chuyên biệt hoặc làm bài thi tổng hợp ngẫu nhiên
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowApiKeyModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition border self-start sm:self-auto bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 border-indigo-200 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{hasGeminiKey ? 'Cấu hình AI Gemini' : '✨ Kích hoạt AI Gemini'}</span>
+            </button>
           </div>
 
           {/* 8 Quiz Type Cards */}
@@ -651,13 +728,39 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
               (currentLesson._count?.grammars || 0) > 0
             ) {
               return (
-                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-800 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>
-                    Bài học <strong>"{currentLesson.title}"</strong> có{' '}
-                    <strong>{currentLesson._count?.grammars} cấu trúc ngữ pháp</strong>. Hệ thống sẽ
-                    tự động tạo bộ câu hỏi trắc nghiệm chuyên sâu về ngữ pháp cho bạn ôn tập!
-                  </span>
+                <div className="p-4 bg-gradient-to-r from-indigo-50/90 to-blue-50/90 border border-indigo-200 rounded-2xl text-xs space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 font-bold text-indigo-900">
+                      <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>
+                        Bài học "{currentLesson.title}" có {currentLesson._count?.grammars} cấu trúc ngữ pháp
+                      </span>
+                    </div>
+                    {hasGeminiKey ? (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                        ✓ AI Gemini tự động sáng tạo đề
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                        Thuật toán biến hóa động 12 động từ
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    {hasGeminiKey
+                      ? '✨ Hệ thống sẽ kết nối với Google Gemini AI để tự động sáng tạo 10 câu trắc nghiệm ngữ pháp hoàn toàn mới, biến hóa ngữ cảnh giao tiếp thực tế và không bao giờ lặp lại!'
+                      : 'Hệ thống tự động áp dụng thuật toán biến hóa 12 động từ tiếng Hàn đa dạng (사다, 먹다, 보다, 만들다, 듣다, 만나다...) giúp các câu hỏi luôn khác nhau và không bị lặp lại. Bạn cũng có thể kích hoạt thêm Google Gemini AI để tạo câu phong phú như người bản xứ!'}
+                  </p>
+                  {!hasGeminiKey && (
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeyModal(true)}
+                      className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline inline-flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      Nhấn vào đây để kết nối Gemini API Key miễn phí
+                    </button>
+                  )}
                 </div>
               );
             }
@@ -672,7 +775,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
               className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition flex items-center gap-2"
             >
               {loading ? (
-                <span>Đang khởi tạo đề...</span>
+                <span>{hasGeminiKey ? '✨ AI Gemini đang sáng tạo đề thi...' : 'Đang khởi tạo đề...'}</span>
               ) : (
                 <>
                   <Award className="w-4 h-4" />
@@ -680,6 +783,83 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Gemini API Key Configuration Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Cấu hình Google Gemini AI</h3>
+                  <p className="text-[11px] text-slate-500">Tự động sáng tạo bài tập ngữ pháp thông minh</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveApiKey} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Gemini API Key</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Dán API Key (AIzaSy...)"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Khóa API được lưu an toàn trong cơ sở dữ liệu của bạn để gọi Gemini AI tự động tạo 10 câu hỏi ngữ cảnh mới mỗi lần bạn bấm ôn tập.
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                <p className="font-bold">Chưa có API Key?</p>
+                <p className="text-slate-600">Google cung cấp API Key hoàn toàn miễn phí, không cần thẻ tín dụng.</p>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-bold text-blue-600 hover:underline pt-0.5"
+                >
+                  <span>Lấy khóa API miễn phí tại Google AI Studio</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingKey}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{savingKey ? 'Đang lưu...' : 'Lưu & Kích hoạt'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
