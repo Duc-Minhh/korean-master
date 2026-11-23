@@ -43,7 +43,7 @@ export interface StudyDeck {
   count: number;
   sampleWords?: { korean: string; vietnamese: string }[];
   topicId?: string;
-  specialMode?: 'all' | 'difficult' | 'new' | 'random';
+  specialMode?: 'all' | 'random';
   icon?: string;
 }
 
@@ -107,6 +107,8 @@ export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
   const allDecks = useMemo<StudyDeck[]>(() => {
     const list: StudyDeck[] = [];
 
+    const totalVocab = topics.reduce((acc, t) => acc + (t._count?.vocabularies || 0), 0);
+
     // 1. Special / Quick Decks
     list.push(
       {
@@ -116,28 +118,8 @@ export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
         subtitle: 'Ôn luyện toàn bộ kho từ vựng cá nhân của bạn',
         categoryLabel: 'Bộ thẻ chung',
         categoryColor: 'bg-blue-50 text-blue-700 border-blue-200',
-        count: topics.reduce((acc, t) => acc + (t._count?.vocabularies || 0), 0),
+        count: totalVocab,
         specialMode: 'all',
-      },
-      {
-        id: 'special-difficult',
-        type: 'special',
-        title: 'Thẻ khó & Hay nhầm',
-        subtitle: 'Các từ được đánh dấu khó hoặc bạn từng chọn sai',
-        categoryLabel: 'Cần củng cố',
-        categoryColor: 'bg-rose-50 text-rose-700 border-rose-200',
-        count: 0,
-        specialMode: 'difficult',
-      },
-      {
-        id: 'special-new',
-        type: 'special',
-        title: 'Từ mới cần học',
-        subtitle: 'Các từ ở trạng thái chưa học, chuẩn bị nạp kiến thức mới',
-        categoryLabel: 'Từ mới',
-        categoryColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        count: 0,
-        specialMode: 'new',
       },
       {
         id: 'special-random',
@@ -146,7 +128,7 @@ export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
         subtitle: 'Thử thách phản xạ nhanh với 30 từ bất kỳ trong kho',
         categoryLabel: 'Phản xạ nhanh',
         categoryColor: 'bg-purple-50 text-purple-700 border-purple-200',
-        count: 30,
+        count: Math.min(30, totalVocab),
         specialMode: 'random',
       }
     );
@@ -699,7 +681,7 @@ export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
                 }`}
               >
                 <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Bộ thẻ nhanh (4)</span>
+                <span>Bộ thẻ nhanh ({allDecks.filter((d) => d.type === 'special').length})</span>
               </button>
 
               <button
@@ -812,11 +794,7 @@ export default function FlashcardStudy({ topics }: FlashcardStudyProps) {
                     ) : isSpecial ? (
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <p className="text-xs text-slate-500 italic">
-                          {deck.specialMode === 'difficult'
-                            ? 'Bao gồm các từ được gắn cờ khó nhớ hoặc hay làm sai'
-                            : deck.specialMode === 'new'
-                            ? 'Bao gồm các từ mới thêm vào chưa từng được ôn tập'
-                            : deck.specialMode === 'random'
+                          {deck.specialMode === 'random'
                             ? 'Lấy 30 từ ngẫu nhiên để luyện phản xạ siêu tốc'
                             : 'Bao gồm tất cả từ vựng bạn đã lưu vào hệ thống'}
                         </p>
