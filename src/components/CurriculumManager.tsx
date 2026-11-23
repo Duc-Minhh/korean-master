@@ -132,11 +132,9 @@ export default function CurriculumManager() {
   ) => {
     let confirmMsg = `Bạn có chắc chắn muốn xóa "${name}"?`;
     if (type === 'lesson') {
-      const vText = counts?.vocabCount ? `${counts.vocabCount} từ vựng` : '';
       const gText = counts?.grammarCount ? `${counts.grammarCount} ngữ pháp` : '';
-      const detail = [vText, gText].filter(Boolean).join(' và ');
       confirmMsg = `Bạn có chắc chắn muốn xóa bài học "${name}"?\nToàn bộ ${
-        detail ? `${detail} thuộc bài học này` : 'từ vựng và ngữ pháp liên kết'
+        gText ? `${gText} thuộc bài học này` : 'ngữ pháp liên kết'
       } cũng sẽ bị xóa vĩnh viễn khỏi hệ thống!`;
     } else if (type === 'chapter') {
       confirmMsg = `Bạn có chắc chắn muốn xóa chương "${name}"?\nToàn bộ các bài học, từ vựng và ngữ pháp thuộc chương này sẽ bị xóa vĩnh viễn!`;
@@ -325,7 +323,7 @@ export default function CurriculumManager() {
 
                                   <div className="flex items-center gap-3">
                                     <span className="text-[11px] text-slate-400">
-                                      {ls._count?.vocabularies || 0} từ • {ls._count?.grammars || 0} ngữ pháp
+                                      {ls._count?.grammars || 0} ngữ pháp
                                     </span>
                                     <button
                                       onClick={() =>

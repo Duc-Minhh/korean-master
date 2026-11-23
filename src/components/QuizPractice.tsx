@@ -607,7 +607,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                Lọc theo chủ đề
+                Lọc theo chủ đề (Từ vựng)
               </label>
               <select
                 value={selectedTopic}
@@ -617,7 +617,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 <option value="all">Tất cả chủ đề</option>
                 {topics.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} ({t._count?.vocabularies || 0} từ • {t._count?.grammars || 0} ngữ pháp)
+                    {t.name} ({t._count?.vocabularies || 0} từ)
                   </option>
                 ))}
               </select>
@@ -625,7 +625,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                Lọc theo bài học
+                Lọc theo bài học (Ngữ pháp)
               </label>
               <select
                 value={selectedLesson}
@@ -635,21 +635,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                 <option value="all">Tất cả bài học</option>
                 {lessons.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.title} ({l._count?.vocabularies || 0} từ • {l._count?.grammars || 0} ngữ pháp)
+                    {l.title} ({l._count?.grammars || 0} ngữ pháp)
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Smart Tip when selected lesson has only grammar */}
+          {/* Smart Tip when selected lesson has grammar */}
           {(() => {
             const currentLesson = lessons.find((l) => l.id === selectedLesson);
-            if (
-              currentLesson &&
-              (currentLesson._count?.vocabularies || 0) === 0 &&
-              (currentLesson._count?.grammars || 0) > 0
-            ) {
+            if (currentLesson && (currentLesson._count?.grammars || 0) > 0) {
               return (
                 <div className="p-3.5 bg-indigo-50 border border-indigo-200/80 rounded-xl text-xs text-indigo-900 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />

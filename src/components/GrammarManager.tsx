@@ -289,22 +289,6 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
             />
           </div>
 
-          {/* Topic Filter */}
-          <div>
-            <select
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value="all">Tất cả chủ đề</option>
-              {topics.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Lesson Filter */}
           <div>
             <select
@@ -489,15 +473,12 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
                 {/* Footer: Tags and Compare Toggle */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {g.topic && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                        {g.topic.name}
-                      </span>
-                    )}
-                    {g.lesson && (
-                      <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                    {g.lesson ? (
+                      <span className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[200px]">
                         {g.lesson.title}
                       </span>
+                    ) : (
+                      <span className="text-[11px] text-slate-300 italic">Chưa phân loại bài</span>
                     )}
                   </div>
 
@@ -679,25 +660,8 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
                 </div>
               </div>
 
-              {/* Topic, Lesson, Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Chủ đề
-                  </label>
-                  <select
-                    value={formData.topicId}
-                    onChange={(e) => setFormData({ ...formData, topicId: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-                  >
-                    <option value="">-- Chưa chọn chủ đề --</option>
-                    {topics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Lesson & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Bài học

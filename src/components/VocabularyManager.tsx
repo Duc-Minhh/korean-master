@@ -519,25 +519,6 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
             </select>
           </div>
 
-          {/* Lesson Filter */}
-          <div>
-            <select
-              value={selectedLesson}
-              onChange={(e) => {
-                setSelectedLesson(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              <option value="all">Tất cả bài học</option>
-              {lessons.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Part of Speech Filter */}
           <div>
             <select
@@ -630,7 +611,7 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                   <th className="py-3.5 px-4">Từ tiếng Hàn</th>
                   <th className="py-3.5 px-4">Nghĩa tiếng Việt</th>
                   <th className="py-3.5 px-4">Ví dụ minh họa</th>
-                  <th className="py-3.5 px-4">Chủ đề & Bài</th>
+                  <th className="py-3.5 px-4">Chủ đề</th>
                   <th className="py-3.5 px-4 text-center">Trạng thái</th>
                   <th className="py-3.5 px-4 text-right">Thao tác</th>
                 </tr>
@@ -696,20 +677,15 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                       )}
                     </td>
 
-                    {/* Topic & Lesson */}
+                    {/* Topic */}
                     <td className="py-3.5 px-4 text-xs">
-                      <div className="space-y-1">
-                        {v.topic && (
-                          <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                            {v.topic.name}
-                          </span>
-                        )}
-                        {v.lesson && (
-                          <div className="text-[11px] text-slate-500 line-clamp-1">
-                            {v.lesson.title}
-                          </div>
-                        )}
-                      </div>
+                      {v.topic ? (
+                        <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          {v.topic.name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 italic text-xs">Chưa phân loại</span>
+                      )}
                     </td>
 
                     {/* Status Pill */}
@@ -920,7 +896,7 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Topic */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -935,25 +911,6 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                     {topics.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Lesson */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Bài học
-                  </label>
-                  <select
-                    value={formData.lessonId}
-                    onChange={(e) => setFormData({ ...formData, lessonId: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  >
-                    <option value="">-- Chưa chọn bài học --</option>
-                    {lessons.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.title}
                       </option>
                     ))}
                   </select>
@@ -1075,42 +1032,23 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                 <p className="text-xs text-slate-400 mt-1">Hỗ trợ .xlsx, .xls, .csv</p>
               </div>
 
-              {/* Destination Topic & Lesson */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Gán vào chủ đề (tùy chọn):
-                  </label>
-                  <select
-                    value={importTopicId}
-                    onChange={(e) => setImportTopicId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-                  >
-                    <option value="">-- Để trống hoặc theo file --</option>
-                    {topics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Gán vào bài học (tùy chọn):
-                  </label>
-                  <select
-                    value={importLessonId}
-                    onChange={(e) => setImportLessonId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-                  >
-                    <option value="">-- Để trống hoặc theo file --</option>
-                    {lessons.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Destination Topic */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Gán vào chủ đề (tùy chọn):
+                </label>
+                <select
+                  value={importTopicId}
+                  onChange={(e) => setImportTopicId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
+                >
+                  <option value="">-- Để trống hoặc theo file --</option>
+                  {topics.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Preview table */}
