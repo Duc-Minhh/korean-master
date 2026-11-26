@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
     const checkDuplicate = searchParams.get('checkDuplicate');
     if (checkDuplicate !== null) {
       const vietnamese = searchParams.get('vietnamese') || undefined;
+      const topicId = searchParams.get('topicId');
       const excludeId = searchParams.get('excludeId') || undefined;
-      const duplicates = await findVocabDuplicates(checkDuplicate, vietnamese, excludeId);
+      const duplicates = await findVocabDuplicates(checkDuplicate, vietnamese, topicId, excludeId);
       return NextResponse.json({ duplicates });
     }
 
@@ -110,11 +111,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const duplicates = await findVocabDuplicates(korean, vietnamese);
+    const duplicates = await findVocabDuplicates(korean, vietnamese, topicId);
     const conflict = buildDuplicateConflictResponse({
       duplicates,
       allowDuplicate: Boolean(allowDuplicate),
       entityLabel: 'Từ',
+      scopeLabel: topicId ? 'trong chủ đề này' : 'trong nhóm chưa chọn chủ đề',
       primaryValue: korean.trim(),
       secondaryValue: vietnamese.trim(),
       secondaryList: `nghĩa: ${duplicates.map((d) => `"${d.vietnamese}"`).join(', ')}`,

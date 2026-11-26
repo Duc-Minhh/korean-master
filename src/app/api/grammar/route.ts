@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
     const checkDuplicate = searchParams.get('checkDuplicate');
     if (checkDuplicate !== null) {
       const meaning = searchParams.get('meaning') || undefined;
+      const lessonId = searchParams.get('lessonId');
       const excludeId = searchParams.get('excludeId') || undefined;
-      const duplicates = await findGrammarDuplicates(checkDuplicate, meaning, excludeId);
+      const duplicates = await findGrammarDuplicates(checkDuplicate, meaning, lessonId, excludeId);
       return NextResponse.json({ duplicates });
     }
 
@@ -92,11 +93,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const duplicates = await findGrammarDuplicates(structure, meaning);
+    const duplicates = await findGrammarDuplicates(structure, meaning, lessonId);
     const conflict = buildDuplicateConflictResponse({
       duplicates,
       allowDuplicate: Boolean(allowDuplicate),
       entityLabel: 'Cấu trúc ngữ pháp',
+      scopeLabel: lessonId ? 'trong bài học này' : 'trong nhóm chưa chọn bài học',
       primaryValue: structure.trim(),
       secondaryValue: meaning.trim(),
       secondaryList: `ý nghĩa: ${duplicates.map((d) => `"${d.meaning}"`).join(', ')}`,

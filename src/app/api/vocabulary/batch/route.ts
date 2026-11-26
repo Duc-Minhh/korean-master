@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { normalizeText } from '@/lib/duplicate-check';
+import { normalizeScopeId, normalizeText } from '@/lib/duplicate-check';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,14 +14,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Load existing vocabulary keys for fast duplicate filtering
+    // Load existing vocabulary keys scoped by topicId for duplicate filtering
     const existingVocabs = await prisma.vocabulary.findMany({
-      select: { korean: true, vietnamese: true },
+      select: { korean: true, vietnamese: true, topicId: true },
     });
 
-    const seenKorean = new Set(existingVocabs.map((v) => normalizeText(v.korean)));
-    const seenPairs = new Set(
-      existingVocabs.map((v) => `${normalizeText(v.korean)}::${normalizeText(v.vietnamese)}`)
+    const scopeKey = (tid: string | null) => tid || '__NONE__';
+    const seenKoreanByTopic = new Set(
+      existingVocabs.map((v) => `${scopeKey(v.topicId)}::${normalizeText(v.korean)}`)
+    );
+    const seenPairByTopic = new Set(
+      existingVocabs.map(
+        (v) =>
+          `${scopeKey(v.topicId)}::${normalizeText(v.korean)}::${normalizeText(v.vietnamese)}`
+      )
     );
 
     const createdItems = [];
@@ -32,23 +38,26 @@ export async function POST(request: NextRequest) {
 
       const cleanKorean = String(item.korean).trim();
       const cleanVietnamese = String(item.vietnamese).trim();
+      const targetTopicId = normalizeScopeId(item.topicId || topicId);
+      const tKey = scopeKey(targetTopicId);
       const kKey = normalizeText(cleanKorean);
-      const pairKey = `${kKey}::${normalizeText(cleanVietnamese)}`;
+      const topicKoreanKey = `${tKey}::${kKey}`;
+      const topicPairKey = `${tKey}::${kKey}::${normalizeText(cleanVietnamese)}`;
 
-      if (seenPairs.has(pairKey)) {
+      if (seenPairByTopic.has(topicPairKey)) {
         skippedItems.push({
           korean: cleanKorean,
           vietnamese: cleanVietnamese,
-          reason: 'Trùng từ và nghĩa',
+          reason: 'Trùng từ và nghĩa trong chủ đề này',
         });
         continue;
       }
 
-      if (skipDuplicateMode === 'korean' && seenKorean.has(kKey)) {
+      if (skipDuplicateMode === 'korean' && seenKoreanByTopic.has(topicKoreanKey)) {
         skippedItems.push({
           korean: cleanKorean,
           vietnamese: cleanVietnamese,
-          reason: 'Trùng từ tiếng Hàn',
+          reason: 'Trùng từ tiếng Hàn trong chủ đề này',
         });
         continue;
       }
@@ -62,14 +71,14 @@ export async function POST(request: NextRequest) {
           exampleKorean: item.exampleKorean ? String(item.exampleKorean).trim() : null,
           exampleVietnamese: item.exampleVietnamese ? String(item.exampleVietnamese).trim() : null,
           notes: item.notes ? String(item.notes).trim() : null,
-          topicId: item.topicId || topicId || null,
+          topicId: targetTopicId,
           lessonId: item.lessonId || lessonId || null,
           status: item.status || 'NOT_LEARNED',
         },
       });
       createdItems.push(created);
-      seenKorean.add(kKey);
-      seenPairs.add(pairKey);
+      seenKoreanByTopic.add(topicKoreanKey);
+      seenPairByTopic.add(topicPairKey);
     }
 
     // Update study log only when new entries were created

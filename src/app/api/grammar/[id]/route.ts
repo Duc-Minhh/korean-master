@@ -38,7 +38,7 @@ export async function PUT(
     if (body.structure !== undefined) {
       const existing = await prisma.grammar.findUnique({
         where: { id: params.id },
-        select: { structure: true, meaning: true },
+        select: { structure: true, meaning: true, lessonId: true },
       });
       if (!existing) {
         return NextResponse.json({ error: 'Không tìm thấy ngữ pháp' }, { status: 404 });
@@ -46,13 +46,21 @@ export async function PUT(
       const nextStructure = String(body.structure).trim();
       const nextMeaning =
         body.meaning !== undefined ? String(body.meaning).trim() : existing.meaning;
+      const nextLessonId =
+        body.lessonId !== undefined ? body.lessonId || null : existing.lessonId;
       const allowDuplicate = Boolean(body.allowDuplicate);
 
-      const duplicates = await findGrammarDuplicates(nextStructure, nextMeaning, params.id);
+      const duplicates = await findGrammarDuplicates(
+        nextStructure,
+        nextMeaning,
+        nextLessonId,
+        params.id
+      );
       const conflict = buildDuplicateConflictResponse({
         duplicates,
         allowDuplicate,
         entityLabel: 'Cấu trúc ngữ pháp',
+        scopeLabel: nextLessonId ? 'trong bài học này' : 'trong nhóm chưa chọn bài học',
         primaryValue: nextStructure,
         secondaryValue: nextMeaning,
         secondaryList: `ý nghĩa: ${duplicates.map((d) => `"${d.meaning}"`).join(', ')}`,

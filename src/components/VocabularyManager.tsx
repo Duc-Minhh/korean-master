@@ -144,6 +144,7 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
         const params = new URLSearchParams({
           checkDuplicate: formData.korean.trim(),
           vietnamese: formData.vietnamese.trim(),
+          topicId: formData.topicId,
         });
         if (editingItem?.id) {
           params.set('excludeId', editingItem.id);
@@ -164,7 +165,7 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
       clearTimeout(timer);
       controller.abort();
     };
-  }, [isAddModalOpen, formData.korean, formData.vietnamese, editingItem?.id]);
+  }, [isAddModalOpen, formData.korean, formData.vietnamese, formData.topicId, editingItem?.id]);
 
   // Handle Form Submit (Add or Edit)
   const saveVocabulary = async (allowDuplicate = false) => {
@@ -933,8 +934,12 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                       <p className="font-bold">
                         {duplicateError?.message ||
                           (duplicateMatches.some((d) => d.exactMeaningMatch)
-                            ? `Từ "${formData.korean.trim()}" với nghĩa "${formData.vietnamese.trim()}" đã tồn tại trong kho!`
-                            : `Cảnh báo: Từ "${formData.korean.trim()}" đã có trong kho dữ liệu:`)}
+                            ? `Từ "${formData.korean.trim()}" với nghĩa "${formData.vietnamese.trim()}" đã tồn tại ${
+                                formData.topicId ? 'trong chủ đề này' : 'trong nhóm chưa chọn chủ đề'
+                              }!`
+                            : `Cảnh báo: Từ "${formData.korean.trim()}" đã có ${
+                                formData.topicId ? 'trong chủ đề này' : 'trong nhóm chưa chọn chủ đề'
+                              }:`)}
                       </p>
                       {duplicateMatches.length > 0 && (
                         <ul className="list-disc list-inside space-y-0.5 text-[11px]">
@@ -1189,7 +1194,7 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                     onChange={(e) => setSkipDuplicateOnImport(e.target.checked)}
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   />
-                  <span>Tự động bỏ qua các từ tiếng Hàn đã tồn tại trong kho</span>
+                  <span>Tự động bỏ qua các từ tiếng Hàn đã tồn tại trong chủ đề đã chọn</span>
                 </label>
               </div>
 

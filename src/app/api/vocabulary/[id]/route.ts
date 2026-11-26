@@ -42,7 +42,7 @@ export async function PUT(
     if (body.korean !== undefined) {
       const existing = await prisma.vocabulary.findUnique({
         where: { id: params.id },
-        select: { korean: true, vietnamese: true },
+        select: { korean: true, vietnamese: true, topicId: true },
       });
       if (!existing) {
         return NextResponse.json({ error: 'Không tìm thấy từ vựng' }, { status: 404 });
@@ -50,13 +50,21 @@ export async function PUT(
       const nextKorean = String(body.korean).trim();
       const nextVietnamese =
         body.vietnamese !== undefined ? String(body.vietnamese).trim() : existing.vietnamese;
+      const nextTopicId =
+        body.topicId !== undefined ? body.topicId || null : existing.topicId;
       const allowDuplicate = Boolean(body.allowDuplicate);
 
-      const duplicates = await findVocabDuplicates(nextKorean, nextVietnamese, params.id);
+      const duplicates = await findVocabDuplicates(
+        nextKorean,
+        nextVietnamese,
+        nextTopicId,
+        params.id
+      );
       const conflict = buildDuplicateConflictResponse({
         duplicates,
         allowDuplicate,
         entityLabel: 'Từ',
+        scopeLabel: nextTopicId ? 'trong chủ đề này' : 'trong nhóm chưa chọn chủ đề',
         primaryValue: nextKorean,
         secondaryValue: nextVietnamese,
         secondaryList: `nghĩa: ${duplicates.map((d) => `"${d.vietnamese}"`).join(', ')}`,

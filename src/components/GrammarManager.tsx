@@ -113,6 +113,7 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
         const params = new URLSearchParams({
           checkDuplicate: formData.structure.trim(),
           meaning: formData.meaning.trim(),
+          lessonId: formData.lessonId,
         });
         if (editingItem?.id) {
           params.set('excludeId', editingItem.id);
@@ -133,7 +134,7 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
       clearTimeout(timer);
       controller.abort();
     };
-  }, [isAddModalOpen, formData.structure, formData.meaning, editingItem?.id]);
+  }, [isAddModalOpen, formData.structure, formData.meaning, formData.lessonId, editingItem?.id]);
 
   const saveGrammar = async (allowDuplicate = false) => {
     if (
@@ -629,8 +630,12 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
                       <p className="font-bold">
                         {duplicateError?.message ||
                           (duplicateMatches.some((d) => d.exactMeaningMatch)
-                            ? `Cấu trúc "${formData.structure.trim()}" với ý nghĩa "${formData.meaning.trim()}" đã tồn tại!`
-                            : `Cảnh báo: Cấu trúc "${formData.structure.trim()}" đã có trong kho dữ liệu:`)}
+                            ? `Cấu trúc "${formData.structure.trim()}" với ý nghĩa "${formData.meaning.trim()}" đã tồn tại ${
+                                formData.lessonId ? 'trong bài học này' : 'trong nhóm chưa chọn bài học'
+                              }!`
+                            : `Cảnh báo: Cấu trúc "${formData.structure.trim()}" đã có ${
+                                formData.lessonId ? 'trong bài học này' : 'trong nhóm chưa chọn bài học'
+                              }:`)}
                       </p>
                       {duplicateMatches.length > 0 && (
                         <ul className="list-disc list-inside space-y-0.5 text-[11px]">
