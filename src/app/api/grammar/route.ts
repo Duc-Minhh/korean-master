@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { buildDuplicateConflictResponse, findGrammarDuplicates } from '@/lib/duplicate-check';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const checkDuplicate = searchParams.get('checkDuplicate');
+    if (checkDuplicate !== null) {
+      const meaning = searchParams.get('meaning') || undefined;
+      const excludeId = searchParams.get('excludeId') || undefined;
+      const duplicates = await findGrammarDuplicates(checkDuplicate, meaning, excludeId);
+      return NextResponse.json({ duplicates });
+    }
+
     const search = searchParams.get('search') || '';
     const topicId = searchParams.get('topicId') || '';
     const lessonId = searchParams.get('lessonId') || '';
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest) {
       topicId,
       lessonId,
       status,
+      allowDuplicate = false,
     } = body;
 
     if (!structure || !meaning || !usage || !formation || !exampleKorean || !exampleVietnamese) {
@@ -81,6 +91,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const duplicates = await findGrammarDuplicates(structure, meaning);
+    const conflict = buildDuplicateConflictResponse({
+      duplicates,
+      allowDuplicate: Boolean(allowDuplicate),
+      entityLabel: 'Cấu trúc ngữ pháp',
+      primaryValue: structure.trim(),
+      secondaryValue: meaning.trim(),
+      secondaryList: `ý nghĩa: ${duplicates.map((d) => `"${d.meaning}"`).join(', ')}`,
+      overrideHint: 'Nếu đây là cách dùng khác hoàn toàn, bạn có thể xác nhận vẫn thêm.',
+    });
+    if (conflict) return conflict;
 
     const newGrammar = await prisma.grammar.create({
       data: {

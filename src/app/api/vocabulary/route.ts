@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { buildDuplicateConflictResponse, findVocabDuplicates } from '@/lib/duplicate-check';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const checkDuplicate = searchParams.get('checkDuplicate');
+    if (checkDuplicate !== null) {
+      const vietnamese = searchParams.get('vietnamese') || undefined;
+      const excludeId = searchParams.get('excludeId') || undefined;
+      const duplicates = await findVocabDuplicates(checkDuplicate, vietnamese, excludeId);
+      return NextResponse.json({ duplicates });
+    }
+
     const search = searchParams.get('search') || '';
     const topicId = searchParams.get('topicId') || '';
     const lessonId = searchParams.get('lessonId') || '';
@@ -91,6 +100,7 @@ export async function POST(request: NextRequest) {
       topicId,
       lessonId,
       status,
+      allowDuplicate = false,
     } = body;
 
     if (!korean || !vietnamese) {
@@ -99,6 +109,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const duplicates = await findVocabDuplicates(korean, vietnamese);
+    const conflict = buildDuplicateConflictResponse({
+      duplicates,
+      allowDuplicate: Boolean(allowDuplicate),
+      entityLabel: 'Từ',
+      primaryValue: korean.trim(),
+      secondaryValue: vietnamese.trim(),
+      secondaryList: `nghĩa: ${duplicates.map((d) => `"${d.vietnamese}"`).join(', ')}`,
+      overrideHint: 'Nếu đây là từ đồng âm khác nghĩa, hãy xác nhận vẫn thêm.',
+    });
+    if (conflict) return conflict;
 
     const newVocab = await prisma.vocabulary.create({
       data: {

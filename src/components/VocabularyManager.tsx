@@ -89,6 +89,13 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
   const [importTopicId, setImportTopicId] = useState('');
   const [importLessonId, setImportLessonId] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [skipDuplicateOnImport, setSkipDuplicateOnImport] = useState(true);
+
+  // Duplicate check state
+  const [duplicateMatches, setDuplicateMatches] = useState<
+    { id: string; korean: string; vietnamese: string; topicName?: string | null; exactMeaningMatch: boolean }[]
+  >([]);
+  const [duplicateError, setDuplicateError] = useState<{ message: string; canOverride: boolean } | null>(null);
 
   // Fetch vocabulary list
   const fetchVocab = useCallback(async () => {
@@ -122,35 +129,90 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
     fetchVocab();
   }, [fetchVocab]);
 
+  // Real-time duplicate check while typing in Add/Edit modal
+  useEffect(() => {
+    if (!isAddModalOpen || !formData.korean.trim()) {
+      setDuplicateMatches([]);
+      setDuplicateError(null);
+      return;
+    }
+
+    setDuplicateError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          checkDuplicate: formData.korean.trim(),
+          vietnamese: formData.vietnamese.trim(),
+        });
+        if (editingItem?.id) {
+          params.set('excludeId', editingItem.id);
+        }
+        const res = await fetch(`/api/vocabulary?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDuplicateMatches(data.duplicates || []);
+        }
+      } catch {
+        // ignore abort errors
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isAddModalOpen, formData.korean, formData.vietnamese, editingItem?.id]);
+
   // Handle Form Submit (Add or Edit)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveVocabulary = async (allowDuplicate = false) => {
     if (!formData.korean.trim() || !formData.vietnamese.trim()) {
       showToast('Vui lòng nhập từ tiếng Hàn và nghĩa tiếng Việt', 'error');
       return;
     }
 
     try {
+      const payload = { ...formData, allowDuplicate };
       if (editingItem) {
         // Update
         const res = await fetch(`/api/vocabulary/${editingItem.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
+        if (res.status === 409) {
+          const errData = await res.json();
+          if (errData.duplicates) setDuplicateMatches(errData.duplicates);
+          setDuplicateError({ message: errData.error, canOverride: Boolean(errData.canOverride) });
+          showToast(errData.error, 'error');
+          return;
+        }
         if (!res.ok) throw new Error('Cập nhật thất bại');
         showToast('Cập nhật từ vựng thành công!', 'success');
         setEditingItem(null);
         setIsAddModalOpen(false);
+        setDuplicateMatches([]);
+        setDuplicateError(null);
       } else {
         // Add new
         const res = await fetch('/api/vocabulary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(payload),
         });
+        if (res.status === 409) {
+          const errData = await res.json();
+          if (errData.duplicates) setDuplicateMatches(errData.duplicates);
+          setDuplicateError({ message: errData.error, canOverride: Boolean(errData.canOverride) });
+          showToast(errData.error, 'error');
+          return;
+        }
         if (!res.ok) throw new Error('Thêm từ vựng thất bại');
         showToast('Đã thêm từ vựng mới!', 'success');
+        setDuplicateMatches([]);
+        setDuplicateError(null);
 
         if (isContinuousAdd) {
           // Reset only word fields, keep topic and lesson for fast entry
@@ -174,6 +236,11 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveVocabulary(false);
+  };
+
   const resetForm = () => {
     setFormData({
       korean: '',
@@ -188,6 +255,8 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
       status: 'NOT_LEARNED',
     });
     setEditingItem(null);
+    setDuplicateMatches([]);
+    setDuplicateError(null);
   };
 
   const openEditModal = (item: Vocabulary) => {
@@ -204,6 +273,8 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
       lessonId: item.lessonId || '',
       status: item.status,
     });
+    setDuplicateMatches([]);
+    setDuplicateError(null);
     setIsContinuousAdd(false);
     setIsAddModalOpen(true);
   };
@@ -404,12 +475,25 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
           items: importPreview,
           topicId: importTopicId || undefined,
           lessonId: importLessonId || undefined,
+          skipDuplicateMode: skipDuplicateOnImport ? 'korean' : 'korean_meaning',
         }),
       });
 
       if (!res.ok) throw new Error('Nhập dữ liệu thất bại');
       const data = await res.json();
-      showToast(`Đã nhập thành công ${data.count} từ vựng vào kho!`, 'success');
+      if (data.count === 0 && data.skippedCount > 0) {
+        showToast(
+          `Tất cả ${data.skippedCount} từ trong file đều đã tồn tại nên đã được bỏ qua.`,
+          'info'
+        );
+      } else if (data.skippedCount > 0) {
+        showToast(
+          `Đã nhập ${data.count} từ mới, bỏ qua ${data.skippedCount} từ bị trùng!`,
+          'info'
+        );
+      } else {
+        showToast(`Đã nhập thành công ${data.count} từ vựng vào kho!`, 'success');
+      }
       setIsImportModalOpen(false);
       setImportPreview([]);
       fetchVocab();
@@ -833,6 +917,52 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
                 </div>
               </div>
 
+              {/* Duplicate Warning / Conflict Banner */}
+              {(duplicateMatches.length > 0 || duplicateError) && (
+                <div
+                  className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                    duplicateMatches.some((d) => d.exactMeaningMatch) ||
+                    duplicateError?.canOverride === false
+                      ? 'bg-rose-50 border-rose-200 text-rose-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1 flex-1">
+                      <p className="font-bold">
+                        {duplicateError?.message ||
+                          (duplicateMatches.some((d) => d.exactMeaningMatch)
+                            ? `Từ "${formData.korean.trim()}" với nghĩa "${formData.vietnamese.trim()}" đã tồn tại trong kho!`
+                            : `Cảnh báo: Từ "${formData.korean.trim()}" đã có trong kho dữ liệu:`)}
+                      </p>
+                      {duplicateMatches.length > 0 && (
+                        <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                          {duplicateMatches.map((d) => (
+                            <li key={d.id}>
+                              <span className="font-korean font-bold">{d.korean}</span> —{' '}
+                              <span className="font-semibold">{d.vietnamese}</span>
+                              {d.topicName ? ` (Chủ đề: ${d.topicName})` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {duplicateError?.canOverride && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => saveVocabulary(true)}
+                            className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] transition"
+                          >
+                            Vẫn lưu (từ đồng âm khác nghĩa)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Vietnamese Meaning */}
                 <div>
@@ -1033,22 +1163,34 @@ export default function VocabularyManager({ topics, lessons }: VocabularyManager
               </div>
 
               {/* Destination Topic */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Gán vào chủ đề (tùy chọn):
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Gán vào chủ đề (tùy chọn):
+                  </label>
+                  <select
+                    value={importTopicId}
+                    onChange={(e) => setImportTopicId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
+                  >
+                    <option value="">-- Để trống hoặc theo file --</option>
+                    {topics.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={skipDuplicateOnImport}
+                    onChange={(e) => setSkipDuplicateOnImport(e.target.checked)}
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Tự động bỏ qua các từ tiếng Hàn đã tồn tại trong kho</span>
                 </label>
-                <select
-                  value={importTopicId}
-                  onChange={(e) => setImportTopicId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none"
-                >
-                  <option value="">-- Để trống hoặc theo file --</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* Preview table */}

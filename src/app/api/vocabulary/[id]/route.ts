@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { buildDuplicateConflictResponse, findVocabDuplicates } from '@/lib/duplicate-check';
 
 export async function GET(
   request: NextRequest,
@@ -37,6 +38,33 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
+
+    if (body.korean !== undefined) {
+      const existing = await prisma.vocabulary.findUnique({
+        where: { id: params.id },
+        select: { korean: true, vietnamese: true },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: 'Không tìm thấy từ vựng' }, { status: 404 });
+      }
+      const nextKorean = String(body.korean).trim();
+      const nextVietnamese =
+        body.vietnamese !== undefined ? String(body.vietnamese).trim() : existing.vietnamese;
+      const allowDuplicate = Boolean(body.allowDuplicate);
+
+      const duplicates = await findVocabDuplicates(nextKorean, nextVietnamese, params.id);
+      const conflict = buildDuplicateConflictResponse({
+        duplicates,
+        allowDuplicate,
+        entityLabel: 'Từ',
+        primaryValue: nextKorean,
+        secondaryValue: nextVietnamese,
+        secondaryList: `nghĩa: ${duplicates.map((d) => `"${d.vietnamese}"`).join(', ')}`,
+        overrideHint: 'Nếu đây là từ đồng âm khác nghĩa, hãy xác nhận vẫn lưu.',
+      });
+      if (conflict) return conflict;
+    }
+
     const updated = await prisma.vocabulary.update({
       where: { id: params.id },
       data: {

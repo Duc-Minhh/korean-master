@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { buildDuplicateConflictResponse, findGrammarDuplicates } from '@/lib/duplicate-check';
 
 export async function GET(
   request: NextRequest,
@@ -33,6 +34,33 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
+
+    if (body.structure !== undefined) {
+      const existing = await prisma.grammar.findUnique({
+        where: { id: params.id },
+        select: { structure: true, meaning: true },
+      });
+      if (!existing) {
+        return NextResponse.json({ error: 'Không tìm thấy ngữ pháp' }, { status: 404 });
+      }
+      const nextStructure = String(body.structure).trim();
+      const nextMeaning =
+        body.meaning !== undefined ? String(body.meaning).trim() : existing.meaning;
+      const allowDuplicate = Boolean(body.allowDuplicate);
+
+      const duplicates = await findGrammarDuplicates(nextStructure, nextMeaning, params.id);
+      const conflict = buildDuplicateConflictResponse({
+        duplicates,
+        allowDuplicate,
+        entityLabel: 'Cấu trúc ngữ pháp',
+        primaryValue: nextStructure,
+        secondaryValue: nextMeaning,
+        secondaryList: `ý nghĩa: ${duplicates.map((d) => `"${d.meaning}"`).join(', ')}`,
+        overrideHint: 'Nếu là cách dùng khác, hãy xác nhận vẫn lưu.',
+      });
+      if (conflict) return conflict;
+    }
+
     const updated = await prisma.grammar.update({
       where: { id: params.id },
       data: {

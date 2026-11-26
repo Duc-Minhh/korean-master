@@ -66,6 +66,12 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
     status: 'NOT_LEARNED' as LearningStatus,
   });
 
+  // Duplicate check state
+  const [duplicateMatches, setDuplicateMatches] = useState<
+    { id: string; structure: string; meaning: string; lessonTitle?: string | null; exactMeaningMatch: boolean }[]
+  >([]);
+  const [duplicateError, setDuplicateError] = useState<{ message: string; canOverride: boolean } | null>(null);
+
   const fetchGrammar = useCallback(async () => {
     setLoading(true);
     try {
@@ -92,8 +98,44 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
     fetchGrammar();
   }, [fetchGrammar]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Real-time duplicate check while typing structure in Add/Edit modal
+  useEffect(() => {
+    if (!isAddModalOpen || !formData.structure.trim()) {
+      setDuplicateMatches([]);
+      setDuplicateError(null);
+      return;
+    }
+
+    setDuplicateError(null);
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          checkDuplicate: formData.structure.trim(),
+          meaning: formData.meaning.trim(),
+        });
+        if (editingItem?.id) {
+          params.set('excludeId', editingItem.id);
+        }
+        const res = await fetch(`/api/grammar?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDuplicateMatches(data.duplicates || []);
+        }
+      } catch {
+        // ignore abort errors
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isAddModalOpen, formData.structure, formData.meaning, editingItem?.id]);
+
+  const saveGrammar = async (allowDuplicate = false) => {
     if (
       !formData.structure.trim() ||
       !formData.meaning.trim() ||
@@ -107,23 +149,28 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
     }
 
     try {
-      if (editingItem) {
-        const res = await fetch(`/api/grammar/${editingItem.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        if (!res.ok) throw new Error('Cập nhật thất bại');
-        showToast('Cập nhật ngữ pháp thành công!', 'success');
-      } else {
-        const res = await fetch('/api/grammar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-        if (!res.ok) throw new Error('Thêm ngữ pháp thất bại');
-        showToast('Đã thêm cấu trúc ngữ pháp mới!', 'success');
+      const payload = { ...formData, allowDuplicate };
+      const url = editingItem ? `/api/grammar/${editingItem.id}` : '/api/grammar';
+      const method = editingItem ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 409) {
+        const errData = await res.json();
+        if (errData.duplicates) setDuplicateMatches(errData.duplicates);
+        setDuplicateError({ message: errData.error, canOverride: Boolean(errData.canOverride) });
+        showToast(errData.error, 'error');
+        return;
       }
+
+      if (!res.ok) throw new Error(editingItem ? 'Cập nhật thất bại' : 'Thêm ngữ pháp thất bại');
+      showToast(
+        editingItem ? 'Cập nhật ngữ pháp thành công!' : 'Đã thêm cấu trúc ngữ pháp mới!',
+        'success'
+      );
 
       setIsAddModalOpen(false);
       resetForm();
@@ -131,6 +178,11 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
     } catch (err: any) {
       showToast(err.message || 'Lỗi xử lý', 'error');
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveGrammar(false);
   };
 
   const resetForm = () => {
@@ -149,6 +201,8 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
       status: 'NOT_LEARNED',
     });
     setEditingItem(null);
+    setDuplicateMatches([]);
+    setDuplicateError(null);
   };
 
   const openEditModal = (item: Grammar) => {
@@ -167,6 +221,8 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
       lessonId: item.lessonId || '',
       status: item.status,
     });
+    setDuplicateMatches([]);
+    setDuplicateError(null);
     setIsAddModalOpen(true);
   };
 
@@ -556,6 +612,52 @@ export default function GrammarManager({ topics, lessons }: GrammarManagerProps)
                   />
                 </div>
               </div>
+
+              {/* Duplicate Warning / Conflict Banner */}
+              {(duplicateMatches.length > 0 || duplicateError) && (
+                <div
+                  className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                    duplicateMatches.some((d) => d.exactMeaningMatch) ||
+                    duplicateError?.canOverride === false
+                      ? 'bg-rose-50 border-rose-200 text-rose-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1 flex-1">
+                      <p className="font-bold">
+                        {duplicateError?.message ||
+                          (duplicateMatches.some((d) => d.exactMeaningMatch)
+                            ? `Cấu trúc "${formData.structure.trim()}" với ý nghĩa "${formData.meaning.trim()}" đã tồn tại!`
+                            : `Cảnh báo: Cấu trúc "${formData.structure.trim()}" đã có trong kho dữ liệu:`)}
+                      </p>
+                      {duplicateMatches.length > 0 && (
+                        <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                          {duplicateMatches.map((d) => (
+                            <li key={d.id}>
+                              <span className="font-korean font-bold">{d.structure}</span> —{' '}
+                              <span className="font-semibold">{d.meaning}</span>
+                              {d.lessonTitle ? ` (Bài: ${d.lessonTitle})` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {duplicateError?.canOverride && (
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => saveGrammar(true)}
+                            className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] transition"
+                          >
+                            Vẫn lưu (cách dùng khác)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Usage */}
               <div>
