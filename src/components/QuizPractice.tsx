@@ -58,19 +58,16 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
     {
       id: 'vocab',
       title: '1. Ôn luyện từ vựng',
-      desc: 'Tổng hợp 5 dạng: Chọn nghĩa Hàn - Việt, Việt - Hàn, điền từ vào câu và luyện gõ chính tả Hangul',
       icon: BookOpen,
     },
     {
       id: 'grammar',
       title: '2. Ôn luyện ngữ pháp',
-      desc: 'Mỗi lần vào làm AI sẽ tự tạo câu tiếng Việt mới theo ngữ pháp đã học để bạn tự dịch sang tiếng Hàn',
       icon: Layers,
     },
     {
       id: 'all',
       title: '3. Đề tổng hợp toàn diện',
-      desc: 'Đề thi hoàn chỉnh 40 câu kết hợp cả Từ vựng theo chủ đề và Ngữ pháp theo bài học',
       icon: Award,
     },
   ];
@@ -698,7 +695,6 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                       </div>
                     </div>
                     <h4 className="font-bold text-sm sm:text-base">{mode.title}</h4>
-                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{mode.desc}</p>
                   </div>
                   {isSelected && (
                     <div className="mt-4 pt-3 border-t border-blue-200/60 text-xs font-bold text-blue-600 flex items-center gap-1.5">
