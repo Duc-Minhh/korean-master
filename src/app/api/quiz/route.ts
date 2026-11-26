@@ -4,6 +4,63 @@ import { GoogleGenAI } from '@google/genai';
 
 export const dynamic = 'force-dynamic';
 
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+
+const TRANSLATION_THEMES = [
+  'sinh hoạt hằng ngày ở nhà và gia đình',
+  'học tập trên lớp, thư viện và thi cử',
+  'đi mua sắm, siêu thị, quán cà phê và ăn uống',
+  'du lịch, cuối tuần, gặp gỡ bạn bè và giải trí',
+  'công việc văn phòng, kế hoạch tương lai và sức khỏe',
+];
+
+function cleanPlainText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .trim();
+}
+
+async function callGeminiJson<T>({
+  apiKey,
+  input,
+  schema,
+}: {
+  apiKey: string;
+  input: string;
+  schema: Record<string, any>;
+}): Promise<T | null> {
+  const ai = new GoogleGenAI({ apiKey });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Disable SDK internal retries (which call Request.clone() and fail in Node 20/Next.js)
+      // and handle retries cleanly with a fresh request per attempt.
+      const interaction = await ai.interactions.create(
+        {
+          model: GEMINI_MODEL,
+          store: false,
+          input,
+          response_format: {
+            type: 'text',
+            mime_type: 'application/json',
+            schema,
+          },
+        },
+        { maxRetries: 0, timeout: 25000 }
+      );
+      const text = interaction.output_text?.trim() || '';
+      if (!text) return null;
+      return JSON.parse(text) as T;
+    } catch (err) {
+      console.warn(`Lỗi gọi Gemini API (lần ${attempt + 1}/3):`, err);
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+      }
+    }
+  }
+  return null;
+}
+
 // Curated high-frequency Korean grammar structures for rich distractor generation
 const DEFAULT_GRAMMAR_POOL = [
   {
@@ -256,7 +313,208 @@ const DYNAMIC_VERB_TEMPLATES = [
   },
 ];
 
-// Call Google Gemini AI to generate completely dynamic, non-repeating TOPIK questions
+/**
+ * Generate fresh Vietnamese -> Korean translation exercises using Gemini AI.
+ * Each invocation uses randomized context themes and a nonce so every session feels new.
+ */
+async function generateTranslationQuestions({
+  apiKey,
+  targetGrammars,
+  count,
+}: {
+  apiKey: string;
+  targetGrammars: any[];
+  count: number;
+}) {
+  const grammarBrief = targetGrammars
+    .map(
+      (g, idx) =>
+        `${idx + 1}. Cấu trúc: "${g.structure}" | Nghĩa: "${g.meaning}" | Cách dùng: "${
+          g.usage || ''
+        }" | Công thức: "${g.formation || ''}" | Ví dụ tham khảo (KHÔNG dùng lại câu này): "${
+          g.exampleVietnamese
+        }" -> "${g.exampleKorean}"`
+    )
+    .join('\n');
+
+  const shuffledThemes = TRANSLATION_THEMES.slice()
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3)
+    .join('; ');
+  const sessionSeed = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const prompt = `Bạn là giáo viên tiếng Hàn giàu kinh nghiệm.
+Mã phiên luyện tập ngẫu nhiên: ${sessionSeed}
+Nhiệm vụ: Tạo đúng ${count} câu bài tập luyện dịch Tiếng Việt → Tiếng Hàn HOÀN TOÀN MỚI cho học viên.
+
+Danh sách cấu trúc ngữ pháp mục tiêu:
+${grammarBrief}
+
+YÊU CẦU BẮT BUỘC:
+1. Tạo ĐÚNG ${count} câu tiếng Việt tự nhiên, gần gũi đời sống, thuộc các bối cảnh khác nhau (gợi ý: ${shuffledThemes}).
+2. TUYỆT ĐỐI KHÔNG chép lại hoặc chỉ sửa nhẹ các "Ví dụ tham khảo" ở trên. Mỗi câu phải dùng động từ/tính từ, chủ ngữ, địa điểm hoặc hoàn cảnh khác nhau.
+3. Mỗi câu tập trung luyện MỘT cấu trúc ngữ pháp cụ thể trong danh sách (phân bổ đều qua toàn bộ danh sách; nếu số câu hỏi nhiều hơn số ngữ pháp thì tạo các tình huống hoàn toàn khác biệt cho cùng cấu trúc đó).
+4. Trường "vietnamese" phải viết bằng Tiếng Việt tự nhiên, rõ nghĩa để người học dịch sang tiếng Hàn.
+5. Trường "grammarStructure" ghi chính xác tên cấu trúc trong danh sách mục tiêu.
+6. Trường "korean" là 1 câu tiếng Hàn tự nhiên, chuẩn ngữ pháp dùng cấu trúc đó, DỊCH CHÍNH XÁC từng chi tiết ngữ nghĩa (tên quốc gia, địa điểm, thời gian, chủ ngữ) khớp với câu "vietnamese".
+7. Trường "explanation" giải thích ngắn gọn bằng tiếng Việt: quy tắc chia cấu trúc (patchim / không patchim / bất quy tắc nếu có) và từ vựng quan trọng trong câu.
+8. Trường "grammarStructure" chỉ ghi đúng tên cấu trúc (không thêm tiền tố "Cấu trúc:"), tuyệt đối chỉ trả về văn bản thuần, KHÔNG chèn thẻ HTML (như <b>, <i>) hay ký tự Markdown (**...**).`;
+
+  const data = await callGeminiJson<{
+    questions: {
+      vietnamese: string;
+      grammarStructure: string;
+      grammarMeaning: string;
+      korean: string;
+      explanation: string;
+    }[];
+  }>({
+    apiKey,
+    input: prompt,
+    schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              vietnamese: { type: 'string' },
+              grammarStructure: { type: 'string' },
+              grammarMeaning: { type: 'string' },
+              korean: { type: 'string' },
+              explanation: { type: 'string' },
+            },
+            required: ['vietnamese', 'grammarStructure', 'grammarMeaning', 'korean', 'explanation'],
+          },
+        },
+      },
+      required: ['questions'],
+    },
+  });
+
+  if (!data?.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+    return null;
+  }
+
+  return data.questions.slice(0, count).map((item, idx) => {
+    const rawStructure = cleanPlainText(item.grammarStructure)
+      .replace(/^cấu\s*trúc\s*:\s*/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    const matchedGrammar =
+      targetGrammars.find((g) => {
+        const gs = g.structure.trim().toLowerCase();
+        const rs = rawStructure.toLowerCase();
+        return gs === rs || rs.includes(gs) || gs.includes(rs);
+      }) || targetGrammars[idx % targetGrammars.length];
+
+    const structureLabel = matchedGrammar?.structure || rawStructure || 'Ngữ pháp';
+
+    return {
+      id: `q_${idx + 1}`,
+      type: 9,
+      typeName: 'Dịch Việt → Hàn',
+      question: cleanPlainText(item.vietnamese),
+      instruction: `Hãy dịch câu tiếng Việt sau sang tiếng Hàn bằng cấu trúc đã học:`,
+      grammarStructure: structureLabel,
+      grammarMeaning: cleanPlainText(item.grammarMeaning || matchedGrammar?.meaning || ''),
+      correctAnswer: cleanPlainText(item.korean),
+      explanation: cleanPlainText(item.explanation),
+      relatedVocabOrGrammar: matchedGrammar?.structure || structureLabel,
+    };
+  });
+}
+
+/**
+ * Evaluate free-form Korean translations in batch with Gemini AI.
+ * Accepts valid synonyms, omitted subjects, and different polite endings as long as
+ * meaning and target grammar usage are accurate.
+ */
+async function gradeTranslationAnswers({
+  apiKey,
+  items,
+}: {
+  apiKey: string;
+  items: {
+    id: string;
+    vietnamese: string;
+    grammarStructure: string;
+    referenceKorean: string;
+    userKorean: string;
+  }[];
+}) {
+  if (items.length === 0) return null;
+
+  const itemList = items
+    .map(
+      (it, idx) =>
+        `${idx + 1}. [id=${it.id}] Câu Việt: "${it.vietnamese}" | Ngữ pháp yêu cầu: "${it.grammarStructure}" | Câu tham khảo: "${it.referenceKorean}" | Học viên viết: "${it.userKorean}"`
+    )
+    .join('\n');
+
+  const prompt = `Bạn là giáo viên tiếng Hàn đang chấm bài tập dịch Việt → Hàn cho học viên.
+
+Danh sách câu cần chấm:
+${itemList}
+
+TIÊU CHÍ CHẤM ĐIỂM CÔNG BẰNG:
+1. "isCorrect" = true nếu câu của học viên:
+   - Truyền đạt đúng ý nghĩa câu tiếng Việt (CHẤP NHẬN từ đồng nghĩa tự nhiên như 엄마/어머니, lược bỏ chủ ngữ 저는, đổi trật tự từ hợp lý, hoặc dùng đuôi câu -아/어요 / -습니다 / -(으)ㄹ 거예요 hợp ngữ cảnh).
+   - Áp dụng đúng cấu trúc ngữ pháp yêu cầu và chia động từ/tính từ chuẩn (bỏ qua lỗi dấu câu '.', ',', '?' hoặc dấu cách nhỏ không làm sai nghĩa).
+2. "isCorrect" = false nếu:
+   - Sai cấu trúc ngữ pháp mục tiêu, chia sai patchim/bất quy tắc, sai thì nghiêm trọng, thiếu ý chính hoặc viết sai nghĩa câu.
+3. "feedback": Nhận xét ngắn gọn, rõ ràng, thân thiện bằng tiếng Việt (nêu điểm đúng và chỉ rõ chỗ sai về ngữ pháp/tiểu từ/từ vựng nếu có).
+4. "correctedKorean": Nếu học viên sai hoặc diễn đạt chưa tự nhiên, viết câu tiếng Hàn đã sửa sát với ý học viên nhất; nếu đã đúng hoàn toàn, viết chính câu hay/tự nhiên nhất.`;
+
+  const data = await callGeminiJson<{
+    results: {
+      id: string;
+      isCorrect: boolean;
+      feedback: string;
+      correctedKorean: string;
+    }[];
+  }>({
+    apiKey,
+    input: prompt,
+    schema: {
+      type: 'object',
+      properties: {
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              isCorrect: { type: 'boolean' },
+              feedback: { type: 'string' },
+              correctedKorean: { type: 'string' },
+            },
+            required: ['id', 'isCorrect', 'feedback', 'correctedKorean'],
+          },
+        },
+      },
+      required: ['results'],
+    },
+  });
+
+  if (!data?.results || !Array.isArray(data.results)) return null;
+
+  const map: Record<string, { isCorrect: boolean; feedback: string; correctedKorean: string }> = {};
+  for (const r of data.results) {
+    if (r?.id) {
+      map[r.id] = {
+        isCorrect: Boolean(r.isCorrect),
+        feedback: cleanPlainText(r.feedback),
+        correctedKorean: cleanPlainText(r.correctedKorean),
+      };
+    }
+  }
+  return map;
+}
+
+// Call Google Gemini AI to generate completely dynamic, non-repeating TOPIK multiple-choice questions
 async function generateGeminiAIQuestions({
   apiKey,
   targetGrammars,
@@ -266,73 +524,89 @@ async function generateGeminiAIQuestions({
   targetGrammars: any[];
   count: number;
 }) {
-  try {
-    const ai = new GoogleGenAI({ apiKey });
+  const grammarBrief = targetGrammars
+    .map(
+      (g, idx) =>
+        `${idx + 1}. Cấu trúc: "${g.structure}" - Ý nghĩa: "${g.meaning}" - Cách dùng: "${
+          g.usage || ''
+        }" - Công thức: "${g.formation || ''}" - Ví dụ: "${g.exampleKorean}" (${
+          g.exampleVietnamese
+        })`
+    )
+    .join('\n');
 
-    const grammarBrief = targetGrammars
-      .map(
-        (g, idx) =>
-          `${idx + 1}. Cấu trúc: "${g.structure}" - Ý nghĩa: "${g.meaning}" - Cách dùng: "${
-            g.usage || ''
-          }" - Công thức: "${g.formation || ''}" - Ví dụ: "${g.exampleKorean}" (${
-            g.exampleVietnamese
-          })`
-      )
-      .join('\n');
-
-    const prompt = `Bạn là chuyên gia giáo dục và khảo thí tiếng Hàn TOPIK cao cấp.
+  const prompt = `Bạn là chuyên gia giáo dục và khảo thí tiếng Hàn TOPIK cao cấp.
 Nhiệm vụ: Hãy tạo ra đúng ${count} câu hỏi trắc nghiệm kiểm tra ngữ pháp tiếng Hàn chất lượng cao cho người học.
 
 Danh sách ngữ pháp trọng tâm:
 ${grammarBrief}
 
 YÊU CẦU NGHIÊM NGẶT:
-1. MỖI CÂU HỎI TRONG ${count} CÂU PHẢI HOÀN TOÀN KHÁC NHAU VỀ NGỮ CẢNH, ĐỘNG TỪ VÀ CHỦ ĐỀ (không được lặp lại câu văn hoặc động từ giống nhau).
+1. MỖI CÂU HỎI TRONG ${count} CÂU PHẢI HOÀN TOÀN KHÁC NHAU VỀ NGỮ CẢNH, ĐỘNG TỪ VÀ CHỦ ĐỀ.
 2. Tận dụng đa dạng chủ đề cuộc sống tự nhiên: công việc, trường học, gia đình, du lịch, ăn uống, sở thích, thời tiết...
-3. Các dạng câu hỏi phong phú:
-   - Dạng 1: Điền dạng chia đúng của động từ vào chỗ trống [ _____ ] trong câu (thử thách patchim, bất quy tắc ㄷ, ㅂ, ㅅ, ㄹ...).
-   - Dạng 2: Cho câu tiếng Hàn hoàn chỉnh, hỏi cấu trúc ngữ pháp nào đã được áp dụng và ý nghĩa là gì.
-   - Dạng 3: Cho câu tiếng Việt, chọn câu tiếng Hàn biểu đạt chuẩn xác và tự nhiên nhất.
-   - Dạng 4: Chọn câu sử dụng đúng ngữ pháp nhất trong 4 câu ví dụ thực tế.
-4. Mỗi câu hỏi gồm đủ 4 phương án trắc nghiệm A, B, C, D độc lập, trong đó chỉ có 1 phương án đúng.
-5. Giải thích (explanation) phải chi tiết bằng tiếng Việt: vì sao đúng, phân tích nguyên tắc chia và mẹo ghi nhớ.
+3. Các dạng câu hỏi phong phú (type 6, 7 hoặc 8):
+   - Dạng 7: Điền dạng chia đúng của động từ vào chỗ trống [ _____ ] trong câu.
+   - Dạng 6: Cho câu hoặc ý nghĩa, chọn cấu trúc ngữ pháp phù hợp.
+   - Dạng 8: Chọn câu tiếng Hàn sử dụng đúng ngữ pháp nhất trong 4 phương án.
+4. Mỗi câu hỏi gồm đủ 4 phương án trắc nghiệm độc lập, trong đó chỉ có 1 phương án đúng nằm trong "options".
+5. Giải thích (explanation) chi tiết bằng tiếng Việt.`;
 
-Định dạng trả về: JSON thuần túy (Mảng JSON gồm ${count} phần tử) với schema:
-[
-  {
-    "id": "q_1",
-    "type": 7,
-    "typeName": "Điền cấu trúc ngữ pháp vào câu",
-    "question": "어제 시장에서 [ _____ ] 사과가 아주 달고 맛있었어요.",
-    "instruction": "Nghĩa câu: 'Quả táo tôi đã mua ở chợ hôm qua rất ngọt và ngon'. Điền dạng chia đúng:",
-    "options": ["산", "사는", "살", "사서"],
-    "correctAnswer": "산",
-    "explanation": "Động từ '사다' (mua) không có patchim, khi kết hợp với định ngữ quá khứ '-(으)ㄴ' tạo thành '산' (đã mua).",
-    "relatedVocabOrGrammar": "${targetGrammars[0]?.structure || 'Ngữ pháp'}"
-  }
-]
-CHỈ TRẢ VỀ JSON HỢP LỆ, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC NGOÀI JSON.`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
+  const data = await callGeminiJson<{
+    questions: {
+      type: number;
+      typeName: string;
+      question: string;
+      instruction: string;
+      options: string[];
+      correctAnswer: string;
+      explanation: string;
+      relatedVocabOrGrammar: string;
+    }[];
+  }>({
+    apiKey,
+    input: prompt,
+    schema: {
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'integer' },
+              typeName: { type: 'string' },
+              question: { type: 'string' },
+              instruction: { type: 'string' },
+              options: { type: 'array', items: { type: 'string' } },
+              correctAnswer: { type: 'string' },
+              explanation: { type: 'string' },
+              relatedVocabOrGrammar: { type: 'string' },
+            },
+            required: [
+              'type',
+              'typeName',
+              'question',
+              'instruction',
+              'options',
+              'correctAnswer',
+              'explanation',
+              'relatedVocabOrGrammar',
+            ],
+          },
+        },
       },
-    });
+      required: ['questions'],
+    },
+  });
 
-    const responseText = response.text?.trim() || '';
-    if (!responseText) return null;
-
-    const parsed = JSON.parse(responseText);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.slice(0, count);
-    }
-    return null;
-  } catch (err) {
-    console.warn('Lỗi gọi Gemini AI tạo câu hỏi (chuyển sang bộ sinh động thông minh):', err);
+  if (!data?.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
     return null;
   }
+
+  return data.questions.slice(0, count).map((q, idx) => ({
+    id: `q_${idx + 1}`,
+    ...q,
+  }));
 }
 
 export async function GET(request: NextRequest) {
@@ -373,7 +647,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-    } else if (typeParam === 'grammar') {
+    } else if (typeParam === 'grammar' || typeParam === 'grammar-translate') {
       if (targetGrammars.length === 0) {
         return NextResponse.json(
           { error: 'Bài học này hiện chưa có cấu trúc ngữ pháp nào để tạo bài ôn luyện ngữ pháp.' },
@@ -621,9 +895,65 @@ export async function GET(request: NextRequest) {
     }
 
     // =========================================================================
-    // TRƯỜNG HỢP 2: ÔN LUYỆN NGỮ PHÁP (typeParam === 'grammar' hoặc dạng 6-8)
+    // TRƯỜNG HỢP 2: ÔN LUYỆN NGỮ PHÁP - DỊCH VIỆT → HÀN (typeParam === 'grammar' hoặc 'grammar-translate')
     // =========================================================================
-    if (typeParam === 'grammar' || ['6', '7', '8'].includes(typeParam)) {
+    if (typeParam === 'grammar' || typeParam === 'grammar-translate') {
+      if (targetGrammars.length === 0) {
+        return NextResponse.json(
+          { error: 'Bài học này hiện chưa có cấu trúc ngữ pháp nào để luyện tập.' },
+          { status: 400 }
+        );
+      }
+
+      if (geminiKey) {
+        const translationQuestions = await generateTranslationQuestions({
+          apiKey: geminiKey,
+          targetGrammars,
+          count: questionCount,
+        });
+
+        if (translationQuestions && translationQuestions.length > 0) {
+          return NextResponse.json({
+            title: `Ôn luyện Ngữ pháp · Dịch Việt → Hàn AI (${translationQuestions.length} câu)`,
+            total: translationQuestions.length,
+            isAIGenerated: true,
+            questions: translationQuestions.map((q: any, idx: number) => ({ ...q, id: `q_${idx + 1}` })),
+          });
+        }
+      }
+
+      // Fallback nếu chưa cấu hình Gemini Key hoặc AI tạm gián đoạn
+      const shuffledGrammars = shuffle(targetGrammars);
+      const fallbackQuestions = Array.from({ length: Math.min(questionCount, Math.max(targetGrammars.length, 1)) }, (_, idx) => {
+        const g = shuffledGrammars[idx % shuffledGrammars.length];
+        return {
+          id: `q_${idx + 1}`,
+          type: 9,
+          typeName: 'Dịch Việt → Hàn',
+          question: g.exampleVietnamese || `Hãy viết một câu ví dụ bằng tiếng Hàn với cấu trúc ${g.structure}`,
+          instruction: `Hãy dịch câu tiếng Việt sau sang tiếng Hàn bằng cấu trúc đã học:`,
+          grammarStructure: g.structure,
+          grammarMeaning: g.meaning,
+          correctAnswer: g.exampleKorean || '',
+          explanation: `Cấu trúc "${g.structure}": ${g.meaning}. ${g.usage ? `Cách dùng: ${g.usage}. ` : ''}${
+            g.formation ? `Công thức: ${g.formation}` : ''
+          }`,
+          relatedVocabOrGrammar: g.structure,
+        };
+      });
+
+      return NextResponse.json({
+        title: `Ôn luyện Ngữ pháp · Dịch Việt → Hàn (${fallbackQuestions.length} câu)`,
+        total: fallbackQuestions.length,
+        isAIGenerated: false,
+        questions: fallbackQuestions,
+      });
+    }
+
+    // =========================================================================
+    // TRƯỜNG HỢP 2C: NGỮ PHÁP TRẮC NGHIỆM LEGACY (dạng 6-8)
+    // =========================================================================
+    if (['6', '7', '8'].includes(typeParam)) {
       // Thử gọi AI Gemini nếu có key
       if (geminiKey && targetGrammars.length > 0) {
         const aiQuestions = await generateGeminiAIQuestions({
@@ -733,13 +1063,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Dữ liệu kiểm tra không hợp lệ' }, { status: 400 });
     }
 
+    // Batch AI grading for Type 9 (Vietnamese -> Korean translation)
+    const nonEmptyType9Items = questions
+      .filter((q: any) => q.type === 9 && String(userAnswers[q.id] || '').trim().length > 0)
+      .map((q: any) => ({
+        id: String(q.id),
+        vietnamese: String(q.question || ''),
+        grammarStructure: String(q.grammarStructure || q.relatedVocabOrGrammar || ''),
+        referenceKorean: String(q.correctAnswer || ''),
+        userKorean: String(userAnswers[q.id] || '').trim(),
+      }));
+
+    let aiGrades: Record<string, { isCorrect: boolean; feedback: string; correctedKorean: string }> | null = null;
+    if (nonEmptyType9Items.length > 0) {
+      const userSetting = await prisma.userSetting.findUnique({ where: { id: 'default-user' } });
+      const geminiKey = process.env.GEMINI_API_KEY || userSetting?.geminiApiKey;
+      if (geminiKey) {
+        aiGrades = await gradeTranslationAnswers({
+          apiKey: geminiKey,
+          items: nonEmptyType9Items,
+        });
+      }
+    }
+
     let correctCount = 0;
     const evaluatedQuestions = questions.map((q: any) => {
       const userAns = String(userAnswers[q.id] || '').trim();
-      const correctAns = String(q.correctAnswer).trim();
+      const correctAns = String(q.correctAnswer || '').trim();
 
-      // Check correctness: exact match or clean match for free typing
       let isCorrect = false;
+      let aiFeedback: string | undefined;
+      let correctedAnswer: string | undefined;
+
       if (q.type === 4 || q.type === 5) {
         const cleanUser = userAns.toLowerCase().replace(/[\,\.\;\:]/g, '');
         const cleanCorrect = correctAns.toLowerCase().replace(/[\,\.\;\:]/g, '');
@@ -747,6 +1102,24 @@ export async function POST(request: NextRequest) {
           cleanUser === cleanCorrect ||
           cleanCorrect.includes(cleanUser) ||
           cleanUser.includes(cleanCorrect);
+      } else if (q.type === 9) {
+        if (!userAns) {
+          isCorrect = false;
+          aiFeedback = 'Bạn chưa nhập câu trả lời tiếng Hàn.';
+        } else if (aiGrades?.[q.id]) {
+          isCorrect = Boolean(aiGrades[q.id].isCorrect);
+          aiFeedback = aiGrades[q.id].feedback;
+          correctedAnswer = aiGrades[q.id].correctedKorean;
+        } else {
+          // Offline/fallback grading: compare normalized Hangul strings cleanly (avoid trivial 1-char substring hits)
+          const cleanUser = userAns.replace(/[\s\.\,\!\?\~]/g, '').toLowerCase();
+          const cleanCorrect = correctAns.replace(/[\s\.\,\!\?\~]/g, '').toLowerCase();
+          const hasHangul = /[가-힣]/.test(cleanUser);
+          isCorrect = Boolean(hasHangul && cleanCorrect && cleanUser === cleanCorrect);
+          aiFeedback = isCorrect
+            ? 'Chính xác!'
+            : 'Chấm cơ bản theo so khớp trực tiếp (AI tạm không phản hồi). Hãy đối chiếu cấu trúc câu của bạn với câu gợi ý bên dưới.';
+        }
       } else {
         isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
       }
@@ -757,6 +1130,8 @@ export async function POST(request: NextRequest) {
         ...q,
         userAnswer: userAns,
         isCorrect,
+        ...(aiFeedback ? { aiFeedback } : {}),
+        ...(correctedAnswer ? { correctedAnswer } : {}),
       };
     });
 

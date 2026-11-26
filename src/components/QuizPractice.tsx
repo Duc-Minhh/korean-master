@@ -5,7 +5,6 @@ import {
   Award,
   CheckCircle2,
   XCircle,
-  HelpCircle,
   RefreshCw,
   ArrowRight,
   ArrowLeft,
@@ -16,6 +15,7 @@ import {
   Sparkles,
   BookOpen,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import { Topic, Lesson, QuizQuestion, QuizResult } from '@/types';
 import { speakKorean } from '@/lib/speech';
@@ -43,6 +43,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
+  const [showMeaningHint, setShowMeaningHint] = useState(false);
 
   // Result state
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
@@ -63,7 +64,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
     {
       id: 'grammar',
       title: '2. Ôn luyện ngữ pháp',
-      desc: 'Tổng hợp 3 dạng: Nhận biết cấu trúc, chia đuôi câu và chọn câu sử dụng ngữ pháp đúng',
+      desc: 'Mỗi lần vào làm AI sẽ tự tạo câu tiếng Việt mới theo ngữ pháp đã học để bạn tự dịch sang tiếng Hàn',
       icon: Layers,
     },
     {
@@ -90,7 +91,7 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
         params.set('lessonId', selectedLesson);
       }
 
-      const res = await fetch(`/api/quiz?${params.toString()}`);
+      const res = await fetch(`/api/quiz?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || 'Không thể tạo đề kiểm tra');
@@ -105,11 +106,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
       setIsAIGenerated(Boolean(data.isAIGenerated));
       setUserAnswers({});
       setCurrentQIndex(0);
+      setShowMeaningHint(false);
       setQuizResult(null);
       setIsTesting(true);
 
       if (data.isAIGenerated) {
-        showToast('✨ AI Gemini vừa sáng tạo đề thi mới cho bạn!', 'info');
+        showToast(
+          selectedType === 'grammar'
+            ? '✨ AI vừa tạo các câu tiếng Việt mới để bạn luyện dịch!'
+            : '✨ AI Gemini vừa sáng tạo đề thi mới cho bạn!',
+          'info'
+        );
       }
     } catch (err: any) {
       showToast(err.message || 'Lỗi khởi tạo bài kiểm tra', 'error');
@@ -332,11 +339,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
           <div className="py-4 text-center space-y-3">
             <p className="text-xs text-slate-500 font-medium">{currentQ?.instruction}</p>
             <div className="flex items-center justify-center gap-3">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-korean tracking-wide">
+              <h2
+                className={
+                  currentQ?.type === 9
+                    ? 'text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug max-w-2xl'
+                    : 'text-2xl sm:text-3xl font-extrabold text-slate-900 font-korean tracking-wide'
+                }
+              >
                 {currentQ?.question}
               </h2>
               {/* Audio button if Korean word or sentence */}
-              {/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(currentQ?.question || '') && (
+              {currentQ?.type !== 9 && /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(currentQ?.question || '') && (
                 <button
                   type="button"
                   onClick={() => speakKorean(currentQ?.question || '')}
@@ -349,7 +362,38 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
           </div>
 
           {/* Interactive Answer Input or Options */}
-          {currentQ?.options && currentQ.options.length > 0 ? (
+          {currentQ?.type === 9 ? (
+            /* Type 9: Dịch Việt → Hàn — textarea + grammar hint */
+            <div className="max-w-2xl mx-auto space-y-4">
+              {currentQ.grammarStructure && (
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                    Cấu trúc: {currentQ.grammarStructure}
+                  </span>
+                  {currentQ.grammarMeaning && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMeaningHint((prev) => !prev)}
+                      className="text-xs font-medium text-slate-600 hover:text-indigo-700 bg-slate-100 hover:bg-indigo-50 px-3 py-1 rounded-full transition"
+                    >
+                      {showMeaningHint ? currentQ.grammarMeaning : 'Xem gợi ý nghĩa'}
+                    </button>
+                  )}
+                </div>
+              )}
+              <textarea
+                autoFocus
+                rows={3}
+                value={userAnswers[currentQ?.id] || ''}
+                onChange={(e) => handleAnswerChange(currentQ.id, e.target.value)}
+                placeholder="Nhập câu tiếng Hàn bạn dịch được tại đây..."
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-korean resize-none"
+              />
+              <p className="text-[11px] text-slate-400 text-center">
+                AI sẽ chấm dựa trên đúng ý nghĩa và cách áp dụng ngữ pháp (chấp nhận từ đồng nghĩa và cách chia lịch sự tự nhiên)
+              </p>
+            </div>
+          ) : currentQ?.options && currentQ.options.length > 0 ? (
             /* Multiple Choice Options (Types 1, 2, 3, 6, 7, 8) */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
               {currentQ.options.map((opt, idx) => {
@@ -398,7 +442,10 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
           <div className="flex items-center justify-between pt-6 border-t border-slate-100">
             <button
               disabled={currentQIndex === 0}
-              onClick={() => setCurrentQIndex((i) => Math.max(0, i - 1))}
+              onClick={() => {
+                setShowMeaningHint(false);
+                setCurrentQIndex((i) => Math.max(0, i - 1));
+              }}
               className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 disabled:opacity-40 font-semibold text-xs flex items-center gap-1.5 transition"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -407,7 +454,10 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
 
             {currentQIndex + 1 < questions.length ? (
               <button
-                onClick={() => setCurrentQIndex((i) => Math.min(questions.length - 1, i + 1))}
+                onClick={() => {
+                  setShowMeaningHint(false);
+                  setCurrentQIndex((i) => Math.min(questions.length - 1, i + 1));
+                }}
                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow transition flex items-center gap-1.5"
               >
                 <span>Câu tiếp theo</span>
@@ -417,9 +467,20 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
               <button
                 onClick={handleSubmitQuiz}
                 disabled={loading}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5"
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5"
               >
-                {loading ? 'Đang chấm điểm...' : 'Nộp bài & Xem kết quả'}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>
+                      {questions.some((q) => q.type === 9)
+                        ? 'AI đang chấm & nhận xét...'
+                        : 'Đang chấm điểm...'}
+                    </span>
+                  </>
+                ) : (
+                  <span>Nộp bài & Xem kết quả</span>
+                )}
               </button>
             )}
           </div>
@@ -506,9 +567,15 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                   </span>
                 </div>
 
-                <div className="text-base font-bold text-slate-900 font-korean">
+                <div className={`text-base font-bold text-slate-900 ${q.type === 9 ? '' : 'font-korean'}`}>
                   {q.question}
                 </div>
+
+                {q.type === 9 && q.grammarStructure && (
+                  <div className="text-xs text-indigo-700 font-semibold">
+                    Cấu trúc mục tiêu: {q.grammarStructure}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
                   <div
@@ -518,38 +585,69 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                         : 'bg-rose-50/50 border-rose-200 text-rose-900'
                     }`}
                   >
-                    <span className="font-bold block text-[11px] uppercase">Bạn đã chọn:</span>
+                    <span className="font-bold block text-[11px] uppercase">
+                      {q.type === 9 ? 'Câu tiếng Hàn của bạn:' : 'Bạn đã chọn:'}
+                    </span>
                     <span className="font-korean font-semibold">
                       {q.userAnswer || '(Để trống)'}
                     </span>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800">
-                    <span className="font-bold block text-[11px] uppercase text-slate-500">
-                      Đáp án chính xác:
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold block text-[11px] uppercase text-slate-500">
+                        {q.type === 9 ? 'Đáp án tham khảo:' : 'Đáp án chính xác:'}
+                      </span>
+                      {/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(q.correctAnswer || '') && (
+                        <button
+                          type="button"
+                          onClick={() => speakKorean(q.correctAnswer)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Nghe phát âm"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                     <span className="font-korean font-bold text-emerald-700">
                       {q.correctAnswer}
                     </span>
                   </div>
                 </div>
 
-                {/* Database Explanation */}
-                <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-blue-950 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-[11px] text-blue-700 uppercase">
-                      Giải thích đáp án:
-                    </span>
-                    {/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(q.explanation) && (
-                      <button
-                        onClick={() => speakKorean(q.correctAnswer)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Nghe phát âm"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                {/* AI Feedback (Type 9) + Grammar/Vocab Explanation */}
+                <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-blue-950 space-y-2">
+                  {q.aiFeedback && (
+                    <div className="space-y-1 pb-2 border-b border-blue-200/60">
+                      <span className="font-bold text-[11px] text-indigo-700 uppercase flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        <span>Nhận xét từ AI:</span>
+                      </span>
+                      <p className="leading-relaxed text-slate-800">{q.aiFeedback}</p>
+                      {q.correctedAnswer && q.correctedAnswer !== q.userAnswer && (
+                        <p className="text-xs font-korean font-semibold text-indigo-800 pt-0.5">
+                          Gợi ý chỉnh câu: {q.correctedAnswer}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px] text-blue-700 uppercase">
+                        Giải thích đáp án:
+                      </span>
+                      {/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(q.explanation || '') && (
+                        <button
+                          type="button"
+                          onClick={() => speakKorean(q.correctAnswer)}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="Nghe phát âm"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="leading-relaxed">{q.explanation}</p>
                   </div>
-                  <p className="leading-relaxed">{q.explanation}</p>
                 </div>
               </div>
             ))}
@@ -575,7 +673,11 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                     setSelectedType(mode.id);
                     if (mode.id === 'all') {
                       setQuestionCount(40);
-                    } else if (questionCount === 40) {
+                    } else if (mode.id === 'grammar') {
+                      if (questionCount === 40 || questionCount > 10) {
+                        setQuestionCount(5);
+                      }
+                    } else if (questionCount === 40 || questionCount === 3) {
                       setQuestionCount(10);
                     }
                   }}
@@ -659,10 +761,9 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
                   onChange={(e) => setQuestionCount(Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
-                  <option value={5}>5 câu (Kiểm tra nhanh)</option>
-                  <option value={10}>10 câu (Tiêu chuẩn)</option>
-                  <option value={15}>15 câu (Mở rộng)</option>
-                  <option value={20}>20 câu (Toàn diện)</option>
+                  <option value={3}>3 câu (Luyện nhanh)</option>
+                  <option value={5}>5 câu (Tiêu chuẩn)</option>
+                  <option value={10}>10 câu (Chuyên sâu)</option>
                 </select>
               </div>
 
@@ -741,10 +842,17 @@ export default function QuizPractice({ topics, lessons }: QuizPracticeProps) {
             <button
               onClick={handleStartQuiz}
               disabled={loading}
-              className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition flex items-center gap-2"
+              className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition flex items-center gap-2"
             >
               {loading ? (
-                <span>Đang khởi tạo đề thi...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>
+                    {selectedType === 'grammar'
+                      ? 'AI đang tạo câu tiếng Việt...'
+                      : 'Đang khởi tạo đề thi...'}
+                  </span>
+                </>
               ) : (
                 <>
                   <Award className="w-4 h-4" />

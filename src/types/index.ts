@@ -152,7 +152,7 @@ export interface DashboardStats {
 
 export interface QuizQuestion {
   id: string;
-  type: number; // 1 to 8
+  type: number; // 1 to 9
   typeName: string;
   question: string;
   instruction: string;
@@ -162,6 +162,10 @@ export interface QuizQuestion {
   isCorrect?: boolean;
   explanation: string;
   relatedVocabOrGrammar?: string;
+  grammarStructure?: string;
+  grammarMeaning?: string;
+  aiFeedback?: string;
+  correctedAnswer?: string;
 }
 
 export interface QuizResult {
